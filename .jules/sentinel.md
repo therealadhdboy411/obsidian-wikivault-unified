@@ -17,3 +17,8 @@
 **Vulnerability:** Link display text was used directly in markdown/wikilink construction. Characters like `[`, `]`, and `|` could break the link syntax and potentially be used for injection.
 **Learning:** User-controlled text should be escaped when used to build structured strings like Markdown links to prevent breaking the structure or injecting malicious components.
 **Prevention:** Sanitize or escape special characters in link components (text, alias, path) before string concatenation.
+
+## 2025-05-14 - Robustness of Frontmatter Property Access
+**Vulnerability:** The plugin accessed user-configured frontmatter properties by name without verifying if they were the expected type (Array). This could lead to issues if a property name matched an inherited object property (e.g., `toString`).
+**Learning:** Dynamic property access on objects should be handled carefully, especially when the results are expected to be iterable.
+**Prevention:** Always validate the type of dynamically accessed properties before use.

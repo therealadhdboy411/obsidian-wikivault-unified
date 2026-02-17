@@ -601,10 +601,16 @@ export default class LinkerPlugin extends Plugin {
         // At the moment obsidian does not provide a clean way to get the settings through an API
         // So we read the app.json settings file directly
         // We also Cannot use the vault API because it only reads the vault files not the .obsidian folder
-        const fileContent = await this.app.vault.adapter.read(this.app.vault.configDir + '/app.json');
-        const appSettings = JSON.parse(fileContent);
-        this.settings.defaultUseMarkdownLinks = appSettings.useMarkdownLinks;
-        this.settings.defaultLinkFormat = appSettings.newLinkFormat ?? 'shortest';
+        try {
+            const fileContent = await this.app.vault.adapter.read(this.app.vault.configDir + '/app.json');
+            const appSettings = JSON.parse(fileContent);
+            if (appSettings) {
+                this.settings.defaultUseMarkdownLinks = appSettings.useMarkdownLinks ?? DEFAULT_SETTINGS.defaultUseMarkdownLinks;
+                this.settings.defaultLinkFormat = appSettings.newLinkFormat ?? DEFAULT_SETTINGS.defaultLinkFormat;
+            }
+        } catch (e) {
+            console.error('[Virtual Linker] Error loading Obsidian app settings', e);
+        }
     }
 
     /** Update plugin settings. */

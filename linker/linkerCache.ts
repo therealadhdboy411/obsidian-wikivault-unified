@@ -223,10 +223,15 @@ export class PrefixTree {
         }
 
         const metadata = this.app.metadataCache.getFileCache(file);
-        let aliases: string[] = metadata?.frontmatter?.aliases ?? [];
+        const frontmatter = metadata?.frontmatter;
+        let aliases: string[] = frontmatter?.aliases ?? [];
 
-        let aliasesWithMatchCase: Set<string> = new Set(metadata?.frontmatter?.[this.settings.propertyNameToMatchCase] ?? []);
-        let aliasesWithIgnoreCase: Set<string> = new Set(metadata?.frontmatter?.[this.settings.propertyNameToIgnoreCase] ?? []);
+        // Security: Ensure frontmatter properties are arrays to avoid issues with prototype properties
+        const matchCaseProp = frontmatter?.[this.settings.propertyNameToMatchCase];
+        let aliasesWithMatchCase: Set<string> = new Set(Array.isArray(matchCaseProp) ? matchCaseProp : []);
+
+        const ignoreCaseProp = frontmatter?.[this.settings.propertyNameToIgnoreCase];
+        let aliasesWithIgnoreCase: Set<string> = new Set(Array.isArray(ignoreCaseProp) ? ignoreCaseProp : []);
 
         // if (aliasesWithMatchCase.size > 0 || aliasesWithIgnoreCase.size > 0) {
         //     console.log("Aliases with match case", aliasesWithMatchCase, file.basename);
