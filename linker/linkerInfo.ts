@@ -44,8 +44,14 @@ export class LinkerMetaInfoFetcher {
     refreshSettings(settings?: LinkerPluginSettings) {
         this.settings = settings ?? this.settings;
         this.includeAllFiles = this.settings.includeAllFiles;
-        this.includeDirPattern = new RegExp(`(^|\/)(${this.settings.linkerDirectories.join("|")})\/`);
-        this.excludeDirPattern = new RegExp(`(^|\/)(${this.settings.excludedDirectories.join("|")})\/`);
+
+        const escapeRegExp = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+        const includeDirs = this.settings.linkerDirectories.map(escapeRegExp).join('|');
+        this.includeDirPattern = includeDirs ? new RegExp(`(^|\/)(${includeDirs})\/`) : /$^/;
+
+        const excludeDirs = this.settings.excludedDirectories.map(escapeRegExp).join('|');
+        this.excludeDirPattern = excludeDirs ? new RegExp(`(^|\/)(${excludeDirs})\/`) : /$^/;
     }
 
     getMetaInfo(file: TFile | TAbstractFile) {

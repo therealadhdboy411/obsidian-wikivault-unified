@@ -74,7 +74,7 @@ Your current setup will work without changes! But if you want to explicitly set 
 Obsidian Settings → WikiVault → AI Configuration
 - API Provider: "OpenAI / OpenAI-compatible"
 - OpenAI Compatible Endpoint: "https://api.mistral.ai/v1"
-- API Key: "tXXGkvsrNp8RGSnom37zUZl3kfftiRDz"
+- API Key: "your-api-key-here"
 - Model Name: "mistral-small-latest"
 ```
 
