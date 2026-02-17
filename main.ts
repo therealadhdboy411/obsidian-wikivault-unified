@@ -598,10 +598,16 @@ export default class LinkerPlugin extends Plugin {
         // At the moment obsidian does not provide a clean way to get the settings through an API
         // So we read the app.json settings file directly
         // We also Cannot use the vault API because it only reads the vault files not the .obsidian folder
-        const fileContent = await this.app.vault.adapter.read(this.app.vault.configDir + '/app.json');
-        const appSettings = JSON.parse(fileContent);
-        this.settings.defaultUseMarkdownLinks = appSettings.useMarkdownLinks;
-        this.settings.defaultLinkFormat = appSettings.newLinkFormat ?? 'shortest';
+        try {
+            const fileContent = await this.app.vault.adapter.read(this.app.vault.configDir + '/app.json');
+            const appSettings = JSON.parse(fileContent);
+            this.settings.defaultUseMarkdownLinks = appSettings.useMarkdownLinks ?? false;
+            this.settings.defaultLinkFormat = appSettings.newLinkFormat ?? 'shortest';
+        } catch (e) {
+            console.error('[WikiVault] Error loading app settings', e);
+            this.settings.defaultUseMarkdownLinks = false;
+            this.settings.defaultLinkFormat = 'shortest';
+        }
     }
 
     /** Update plugin settings. */
@@ -846,6 +852,8 @@ class LinkerSettingTab extends PluginSettingTab {
                     );
             }
 
+            const forbiddenPropertyNames = ['constructor', '__proto__', 'prototype', 'toString', 'valueOf', 'toLocaleString', 'hasOwnProperty', 'isPrototypeOf', 'propertyIsEnumerable'];
+
             // Text setting for property name to ignore case
             new Setting(containerEl)
                 .setName('Property name to ignore case')
@@ -854,6 +862,9 @@ class LinkerSettingTab extends PluginSettingTab {
                 )
                 .addText((text) =>
                     text.setValue(this.plugin.settings.propertyNameToIgnoreCase).onChange(async (value) => {
+                        if (forbiddenPropertyNames.includes(value)) {
+                            return;
+                        }
                         // console.log("New property name to ignore case: " + value);
                         await this.plugin.updateSettings({ propertyNameToIgnoreCase: value });
                     })
@@ -867,6 +878,9 @@ class LinkerSettingTab extends PluginSettingTab {
                 )
                 .addText((text) =>
                     text.setValue(this.plugin.settings.propertyNameToMatchCase).onChange(async (value) => {
+                        if (forbiddenPropertyNames.includes(value)) {
+                            return;
+                        }
                         // console.log("New property name to match case: " + value);
                         await this.plugin.updateSettings({ propertyNameToMatchCase: value });
                     })
