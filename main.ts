@@ -226,16 +226,21 @@ export default class LinkerPlugin extends Plugin {
                         : this.settings.linkFormat;
 
                     let replacement = '';
-                    if (replacementPath === link.text && linkFormat === 'shortest') {
+                    const sanitizedText = this.sanitizeLinkText(link.text, useMarkdownLinks);
+
+                    if (replacementPath === link.text && linkFormat === 'shortest' && !useMarkdownLinks) {
                         replacement = `[[${replacementPath}]]`;
                     } else {
-                        const path = linkFormat === 'shortest' ? shortestPath :
+                        let path = linkFormat === 'shortest' ? shortestPath :
                                    linkFormat === 'relative' ? relativePath :
                                    absolutePath;
 
-                        replacement = useMarkdownLinks ?
-                            `[${link.text}](${path})` :
-                            `[[${path}|${link.text}]]`;
+                        if (useMarkdownLinks) {
+                            path = this.sanitizeLinkPath(path);
+                            replacement = `[${sanitizedText}](${path})`;
+                        } else {
+                            replacement = `[[${path}|${sanitizedText}]]`;
+                        }
                     }
 
                     replacements.push({
@@ -269,6 +274,27 @@ export default class LinkerPlugin extends Plugin {
             (linkTo.line < selectionTo.line ||
              (linkTo.line === selectionTo.line && linkTo.ch <= selectionTo.ch))
         );
+    }
+
+    /** Sanitize link text to prevent markdown/wikilink injection. */
+    private sanitizeLinkText(text: string, markdownStyle: boolean): string {
+        if (markdownStyle) {
+            // Escape [ and ] for markdown links
+            return text.replace(/([\[\]])/g, '\\$1');
+        } else {
+            // Remove [, ] and | for wikilinks as they are not easily escapable in aliases
+            return text.replace(/[\[\]|]/g, '');
+        }
+    }
+
+    /** Sanitize link path for markdown links. */
+    private sanitizeLinkPath(path: string): string {
+        // For markdown links, if the path contains spaces or parentheses, it should be wrapped in <>
+        if (path.includes(' ') || path.includes('(') || path.includes(')')) {
+            // Also escape any < or > already in the path to prevent escaping the wrapper
+            return `<${path.replace(/[<>]/g, '')}>`;
+        }
+        return path;
     }
 
     addContextMenuItem(menu: Menu, file: TAbstractFile, source: string) {
@@ -383,10 +409,12 @@ export default class LinkerPlugin extends Plugin {
                                     : settings.linkFormat;
 
                                 const createLink = (replacementPath: string, text: string, markdownStyle: boolean) => {
+                                    const sanitizedText = that.sanitizeLinkText(text, markdownStyle);
                                     if (markdownStyle) {
-                                        return `[${text}](${replacementPath})`;
+                                        const sanitizedPath = that.sanitizeLinkPath(replacementPath);
+                                        return `[${sanitizedText}](${sanitizedPath})`;
                                     } else {
-                                        return `[[${replacementPath}|${text}]]`;
+                                        return `[[${replacementPath}|${sanitizedText}]]`;
                                     }
                                 };
 
@@ -394,7 +422,7 @@ export default class LinkerPlugin extends Plugin {
                                 let replacement = '';
 
                                 // If the file is the same as the shown text, and we can use short links, we use them
-                                if (replacementPath === text && linkFormat === 'shortest') {
+                                if (replacementPath === text && linkFormat === 'shortest' && !useMarkdownLinks) {
                                     replacement = `[[${replacementPath}]]`;
                                 }
                                 // Otherwise create a specific link, using the shown text
