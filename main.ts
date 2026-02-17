@@ -1,4 +1,4 @@
-import { App, EditorPosition, MarkdownView, Menu, Notice, Plugin, PluginSettingTab, Setting, TAbstractFile, TFile, TFolder } from 'obsidian';
+import { App, EditorPosition, MarkdownView, Menu, Notice, Plugin, PluginSettingTab, Setting, TAbstractFile, TFile, TFolder, requestUrl } from 'obsidian';
 
 import { GlossaryLinker } from './linker/readModeLinker';
 import { liveLinkerPlugin } from './linker/liveLinker';
@@ -42,6 +42,22 @@ export interface LinkerPluginSettings {
     excludeLinksToRealLinkedFiles: boolean;
     includeAliases: boolean;
     alwaysShowMultipleReferences: boolean;
+    apiProvider: 'openai' | 'lmstudio';
+    openaiEndpoint: string;
+    openaiApiKey: string;
+    lmstudioEndpoint: string;
+    lmstudioApiKey: string;
+    modelName: string;
+    customPrompt: string;
+    similarityThreshold: number;
+    runOnStartup: boolean;
+    runOnFileSwitch: boolean;
+    useCustomDirectory: boolean;
+    customDirectoryName: string;
+    showProgressNotification: boolean;
+    useDictionaryAPI: boolean;
+    dictionaryAPIEndpoint: string;
+    maxMentionsPerTerm: number;
     // wordBoundaryRegex: string;
     // conversionFormat
 }
@@ -81,12 +97,29 @@ const DEFAULT_SETTINGS: LinkerPluginSettings = {
     excludeLinksToRealLinkedFiles: true,
     includeAliases: true,
     alwaysShowMultipleReferences: false,
+    apiProvider: 'openai',
+    openaiEndpoint: 'https://api.openai.com/v1',
+    openaiApiKey: '',
+    lmstudioEndpoint: 'http://localhost:1234',
+    lmstudioApiKey: '',
+    modelName: 'gpt-3.5-turbo',
+    customPrompt: 'You are a helpful assistant that provides concise, Wikipedia-style definitions for terms. Provide a one-paragraph summary/definition for the term: "{term}"',
+    similarityThreshold: 0.9,
+    runOnStartup: false,
+    runOnFileSwitch: false,
+    useCustomDirectory: true,
+    customDirectoryName: 'Vault Wiki',
+    showProgressNotification: true,
+    useDictionaryAPI: true,
+    dictionaryAPIEndpoint: 'https://api.dictionaryapi.dev/api/v2/entries/en/',
+    maxMentionsPerTerm: 25,
     // wordBoundaryRegex: '/[\t- !-/:-@\[-`{-~\p{Emoji_Presentation}\p{Extended_Pictographic}]/u',
 };
 
 export default class LinkerPlugin extends Plugin {
     settings: LinkerPluginSettings;
     updateManager = new ExternalUpdateManager();
+    statusBarItemEl: HTMLElement;
 
     async onload() {
         await this.loadSettings();
@@ -259,6 +292,31 @@ export default class LinkerPlugin extends Plugin {
                 new Notice(`Converted ${replacements.length} virtual links to real links.`);
             }
         });
+
+        this.statusBarItemEl = this.addStatusBarItem();
+        this.statusBarItemEl.setText('');
+
+        this.addRibbonIcon('book-open', 'Generate WikiVault notes', () => this.generateMissingNotes());
+
+        this.addCommand({
+            id: 'generate-missing-notes',
+            name: 'Generate missing Wikilink notes',
+            callback: () => this.generateMissingNotes(),
+        });
+
+        if (this.settings.runOnStartup) {
+            this.app.workspace.onLayoutReady(() => {
+                this.generateMissingNotes();
+            });
+        }
+
+        this.registerEvent(
+            this.app.workspace.on('file-open', (file) => {
+                if (this.settings.runOnFileSwitch && file) {
+                    this.generateMissingNotes();
+                }
+            })
+        );
 
     }
 
@@ -654,6 +712,261 @@ export default class LinkerPlugin extends Plugin {
         Object.assign(this.settings, settings);
         await this.saveData(this.settings);
         this.updateManager.update();
+    }
+
+    async ensureDirectoryExists(pathToFolder: string) {
+        const folder = this.app.vault.getAbstractFileByPath(pathToFolder);
+        if (!(folder instanceof TFolder)) {
+            await this.app.vault.createFolder(pathToFolder);
+        }
+    }
+
+    async generateMissingNotes() {
+        const unresolvedLinks = this.app.metadataCache.unresolvedLinks;
+        const linksToProcess = new Set<string>();
+
+        for (const sourcePath in unresolvedLinks) {
+            for (const linkName in unresolvedLinks[sourcePath]) {
+                linksToProcess.add(linkName);
+            }
+        }
+
+        if (linksToProcess.size === 0) {
+            new Notice('WikiVault: No unresolved links found.');
+            return;
+        }
+
+        if (this.settings.useCustomDirectory) {
+            await this.ensureDirectoryExists(this.settings.customDirectoryName);
+        }
+
+        const total = linksToProcess.size;
+        let current = 0;
+        let notice: Notice | null = null;
+
+        if (this.settings.showProgressNotification) {
+            notice = new Notice(`WikiVault: Processing 0/${total} links...`, 0);
+        }
+
+        for (const linkName of linksToProcess) {
+            await this.processWikiLink(linkName);
+            current++;
+
+            const progressText = `WikiVault: ${current}/${total} links`;
+            this.statusBarItemEl.setText(progressText);
+            if (notice) {
+                notice.setMessage(`WikiVault: Processing ${current}/${total} links...`);
+            }
+        }
+
+        setTimeout(() => {
+            this.statusBarItemEl.setText('');
+            if (notice) notice.hide();
+            new Notice(`WikiVault: Completed processing ${total} links.`);
+        }, 2000);
+    }
+
+    async processWikiLink(linkName: string) {
+        const baseFileName = `${linkName}.md`;
+        const fullPath = this.settings.useCustomDirectory ? `${this.settings.customDirectoryName}/${baseFileName}` : baseFileName;
+        const existingFile = this.app.vault.getAbstractFileByPath(fullPath);
+
+        let content = '';
+
+        const fuzzyMatch = this.findFuzzyMatch(linkName);
+        if (fuzzyMatch && fuzzyMatch.basename.toLowerCase() !== linkName.toLowerCase()) {
+            content += `See [[${fuzzyMatch.basename}]]\n\n`;
+        }
+
+        const context = await this.extractContext(linkName);
+        content += `## Mentions\n\n${context}\n\n`;
+
+        if (this.settings.useDictionaryAPI) {
+            const dictionaryDefinition = await this.getDictionaryDefinition(linkName);
+            if (dictionaryDefinition) {
+                content += `## Dictionary Definition\n\n${dictionaryDefinition}\n\n`;
+            }
+        }
+
+        const summary = await this.getAISummary(linkName);
+        if (summary) {
+            content = `# ${linkName}\n\n> ${summary}\n\n` + content;
+        } else {
+            content = `# ${linkName}\n\n` + content;
+        }
+
+        if (existingFile instanceof TFile) {
+            await this.app.vault.modify(existingFile, content);
+        } else {
+            await this.app.vault.create(fullPath, content);
+        }
+    }
+
+    findFuzzyMatch(linkName: string): TFile | null {
+        const files = this.app.vault.getMarkdownFiles();
+        for (const file of files) {
+            const similarity = this.calculateSimilarity(linkName.toLowerCase(), file.basename.toLowerCase());
+            if (similarity >= this.settings.similarityThreshold) {
+                return file;
+            }
+        }
+        return null;
+    }
+
+    calculateSimilarity(s1: string, s2: string): number {
+        const longer = s1.length > s2.length ? s1 : s2;
+        const shorter = s1.length > s2.length ? s2 : s1;
+        if (longer.length === 0) return 1;
+        return (longer.length - this.editDistance(longer, shorter)) / longer.length;
+    }
+
+    editDistance(s1: string, s2: string): number {
+        const costs: number[] = [];
+        for (let i = 0; i <= s1.length; i++) {
+            let lastValue = i;
+            for (let j = 0; j <= s2.length; j++) {
+                if (i === 0) costs[j] = j;
+                else if (j > 0) {
+                    let newValue = costs[j - 1];
+                    if (s1.charAt(i - 1) !== s2.charAt(j - 1)) {
+                        newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
+                    }
+                    costs[j - 1] = lastValue;
+                    lastValue = newValue;
+                }
+            }
+            if (i > 0) costs[s2.length] = lastValue;
+        }
+        return costs[s2.length];
+    }
+
+    async extractContext(linkName: string): Promise<string> {
+        let context = '';
+        let mentionCount = 0;
+        const mentionRegex = new RegExp(`\\[\\[${linkName.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}(\\|[^\\]]+)?\\]\\]`, 'i');
+
+        for (const file of this.app.vault.getMarkdownFiles()) {
+            if (this.settings.useCustomDirectory && file.path.startsWith(this.settings.customDirectoryName)) continue;
+            const content = await this.app.vault.read(file);
+            const lines = content.split('\n');
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                if (!mentionRegex.test(line)) continue;
+
+                context += `From [[${file.basename}]]:\n`;
+                if (this.isBulletPoint(line)) {
+                    if (i > 0 && this.isBulletPoint(lines[i - 1])) {
+                        context += `> ${lines[i - 1]}\n`;
+                    }
+                    context += `> ${line}\n`;
+
+                    let j = i + 1;
+                    const currentIndent = this.getIndentLevel(line);
+                    while (j < lines.length && this.getIndentLevel(lines[j]) > currentIndent) {
+                        context += `> ${lines[j]}\n`;
+                        j++;
+                    }
+                } else {
+                    context += `> ${line}\n`;
+                }
+                context += '\n';
+                mentionCount++;
+
+                if (mentionCount >= this.settings.maxMentionsPerTerm) {
+                    return context;
+                }
+            }
+        }
+
+        if (mentionCount === 0) {
+            return '*No mentions found in the vault.*\n';
+        }
+
+        return context;
+    }
+
+    isBulletPoint(line: string): boolean {
+        const trimmed = line.trim();
+        return trimmed.startsWith('- ') || trimmed.startsWith('* ') || /^\d+\. /.test(trimmed);
+    }
+
+    getIndentLevel(line: string): number {
+        const match = line.match(/^(\s*)/);
+        return match ? match[1].length : 0;
+    }
+
+    async getDictionaryDefinition(term: string): Promise<string | null> {
+        if (!this.settings.dictionaryAPIEndpoint) return null;
+        try {
+            const url = `${this.settings.dictionaryAPIEndpoint}${encodeURIComponent(term)}`;
+            const response = await requestUrl({ url, method: 'GET' });
+            const first = response.json?.[0];
+            const meaning = first?.meanings?.[0];
+            const definition = meaning?.definitions?.[0]?.definition;
+            if (!definition) return null;
+            const pos = meaning?.partOfSpeech ? ` (${meaning.partOfSpeech})` : '';
+            return `${term}${pos}: ${definition}`;
+        } catch (error) {
+            console.error('WikiVault: Dictionary lookup failed', error);
+            return null;
+        }
+    }
+
+    async getAISummary(linkName: string): Promise<string | null> {
+        try {
+            if (this.settings.apiProvider === 'lmstudio') {
+                return await this.getLMStudioSummary(linkName);
+            }
+            return await this.getOpenAISummary(linkName);
+        } catch (error) {
+            console.error('WikiVault: AI Summary failed', error);
+            return null;
+        }
+    }
+
+    async getOpenAISummary(linkName: string): Promise<string | null> {
+        if (!this.settings.openaiApiKey) return null;
+        const prompt = this.settings.customPrompt.replace(/{term}/g, linkName);
+
+        const response = await requestUrl({
+            url: `${this.settings.openaiEndpoint}/chat/completions`,
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${this.settings.openaiApiKey}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                model: this.settings.modelName,
+                messages: [{ role: 'user', content: prompt }],
+                temperature: 0.7,
+                max_tokens: 250,
+            }),
+        });
+
+        return response.json?.choices?.[0]?.message?.content?.trim() ?? null;
+    }
+
+    async getLMStudioSummary(linkName: string): Promise<string | null> {
+        const prompt = this.settings.customPrompt.replace(/{term}/g, linkName);
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (this.settings.lmstudioApiKey) {
+            headers.Authorization = `Bearer ${this.settings.lmstudioApiKey}`;
+        }
+
+        const response = await requestUrl({
+            url: `${this.settings.lmstudioEndpoint}/api/v1/chat`,
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+                model: this.settings.modelName,
+                messages: [{ role: 'user', content: prompt }],
+                temperature: 0.7,
+                max_tokens: 250,
+            }),
+        });
+
+        return response.json?.choices?.[0]?.message?.content?.trim() ?? null;
     }
 }
 
@@ -1137,5 +1450,173 @@ class LinkerSettingTab extends PluginSettingTab {
                         })
                 );
         }
+
+        new Setting(containerEl).setName('Wiki generation').setHeading();
+
+        new Setting(containerEl)
+            .setName('API provider')
+            .setDesc('Select which AI backend should be used for generated wiki summaries.')
+            .addDropdown((dropdown) =>
+                dropdown
+                    .addOption('openai', 'OpenAI / OpenAI-compatible')
+                    .addOption('lmstudio', 'LM Studio (native API)')
+                    .setValue(this.plugin.settings.apiProvider)
+                    .onChange(async (value) => {
+                        await this.plugin.updateSettings({ apiProvider: value as 'openai' | 'lmstudio' });
+                        this.display();
+                    })
+            );
+
+        if (this.plugin.settings.apiProvider === 'openai') {
+            new Setting(containerEl)
+                .setName('OpenAI-compatible endpoint')
+                .setDesc('For example: https://api.openai.com/v1 or https://api.mistral.ai/v1')
+                .addText((text) =>
+                    text.setValue(this.plugin.settings.openaiEndpoint).onChange(async (value) => {
+                        await this.plugin.updateSettings({ openaiEndpoint: value });
+                    })
+                );
+
+            new Setting(containerEl)
+                .setName('OpenAI API key')
+                .setDesc('API key used for OpenAI-compatible providers.')
+                .addText((text) =>
+                    text.setValue(this.plugin.settings.openaiApiKey).onChange(async (value) => {
+                        await this.plugin.updateSettings({ openaiApiKey: value });
+                    })
+                );
+        } else {
+            new Setting(containerEl)
+                .setName('LM Studio endpoint')
+                .setDesc('Default LM Studio local server: http://localhost:1234')
+                .addText((text) =>
+                    text.setValue(this.plugin.settings.lmstudioEndpoint).onChange(async (value) => {
+                        await this.plugin.updateSettings({ lmstudioEndpoint: value });
+                    })
+                );
+
+            new Setting(containerEl)
+                .setName('LM Studio API key (optional)')
+                .setDesc('Leave empty unless authentication is enabled in LM Studio.')
+                .addText((text) =>
+                    text.setValue(this.plugin.settings.lmstudioApiKey).onChange(async (value) => {
+                        await this.plugin.updateSettings({ lmstudioApiKey: value });
+                    })
+                );
+        }
+
+        new Setting(containerEl)
+            .setName('Model name')
+            .setDesc('Identifier of the model loaded by your selected provider.')
+            .addText((text) =>
+                text.setValue(this.plugin.settings.modelName).onChange(async (value) => {
+                    await this.plugin.updateSettings({ modelName: value });
+                })
+            );
+
+        new Setting(containerEl)
+            .setName('Custom prompt')
+            .setDesc('Prompt template for AI summaries. Use {term} placeholder for the unresolved link.')
+            .addTextArea((text) => {
+                text.setValue(this.plugin.settings.customPrompt).onChange(async (value) => {
+                    await this.plugin.updateSettings({ customPrompt: value });
+                });
+                text.inputEl.addClass('linker-settings-text-box');
+            });
+
+        new Setting(containerEl)
+            .setName('Use custom output directory')
+            .setDesc('Store generated notes in a dedicated folder.')
+            .addToggle((toggle) =>
+                toggle.setValue(this.plugin.settings.useCustomDirectory).onChange(async (value) => {
+                    await this.plugin.updateSettings({ useCustomDirectory: value });
+                    this.display();
+                })
+            );
+
+        if (this.plugin.settings.useCustomDirectory) {
+            new Setting(containerEl)
+                .setName('Wiki output directory')
+                .setDesc('Folder where generated notes are created/updated.')
+                .addText((text) =>
+                    text.setValue(this.plugin.settings.customDirectoryName).onChange(async (value) => {
+                        await this.plugin.updateSettings({ customDirectoryName: value });
+                    })
+                );
+        }
+
+        new Setting(containerEl)
+            .setName('Run on startup')
+            .setDesc('Automatically generate missing notes when Obsidian starts.')
+            .addToggle((toggle) =>
+                toggle.setValue(this.plugin.settings.runOnStartup).onChange(async (value) => {
+                    await this.plugin.updateSettings({ runOnStartup: value });
+                })
+            );
+
+        new Setting(containerEl)
+            .setName('Run on file switch')
+            .setDesc('Automatically generate missing notes when switching files.')
+            .addToggle((toggle) =>
+                toggle.setValue(this.plugin.settings.runOnFileSwitch).onChange(async (value) => {
+                    await this.plugin.updateSettings({ runOnFileSwitch: value });
+                })
+            );
+
+        new Setting(containerEl)
+            .setName('Show progress notification')
+            .setDesc('Display persistent progress while generating notes.')
+            .addToggle((toggle) =>
+                toggle.setValue(this.plugin.settings.showProgressNotification).onChange(async (value) => {
+                    await this.plugin.updateSettings({ showProgressNotification: value });
+                })
+            );
+
+        new Setting(containerEl)
+            .setName('Use dictionary API')
+            .setDesc('Fetch dictionary definitions before AI summaries.')
+            .addToggle((toggle) =>
+                toggle.setValue(this.plugin.settings.useDictionaryAPI).onChange(async (value) => {
+                    await this.plugin.updateSettings({ useDictionaryAPI: value });
+                    this.display();
+                })
+            );
+
+        if (this.plugin.settings.useDictionaryAPI) {
+            new Setting(containerEl)
+                .setName('Dictionary API endpoint')
+                .setDesc('Default: https://api.dictionaryapi.dev/api/v2/entries/en/')
+                .addText((text) =>
+                    text.setValue(this.plugin.settings.dictionaryAPIEndpoint).onChange(async (value) => {
+                        await this.plugin.updateSettings({ dictionaryAPIEndpoint: value });
+                    })
+                );
+        }
+
+        new Setting(containerEl)
+            .setName('Fuzzy match threshold')
+            .setDesc('Similarity threshold (0.1-1.0) used to suggest nearby existing notes.')
+            .addSlider((slider) =>
+                slider
+                    .setLimits(0.1, 1, 0.01)
+                    .setValue(this.plugin.settings.similarityThreshold)
+                    .setDynamicTooltip()
+                    .onChange(async (value) => {
+                        await this.plugin.updateSettings({ similarityThreshold: value });
+                    })
+            );
+
+        new Setting(containerEl)
+            .setName('Maximum mentions per generated note')
+            .setDesc('Caps how many contextual mentions are injected into each note.')
+            .addSlider((slider) =>
+                slider
+                    .setLimits(1, 100, 1)
+                    .setValue(this.plugin.settings.maxMentionsPerTerm)
+                    .setDynamicTooltip()
+                    .onChange(async (value) => {
+                        await this.plugin.updateSettings({ maxMentionsPerTerm: value });
+                    })
+            );
     }
 }
