@@ -221,7 +221,9 @@ export default class LinkerPlugin extends Plugin {
                         : this.settings.linkFormat;
 
                     let replacement = '';
-                    if (replacementPath === link.text && linkFormat === 'shortest') {
+                    const sanitizedText = link.text.replace(/[\[\]\|]/g, (match) => match === '|' ? ' ' : `\\${match}`);
+
+                    if (replacementPath === link.text && linkFormat === 'shortest' && !/[\[\]\|]/.test(replacementPath)) {
                         replacement = `[[${replacementPath}]]`;
                     } else {
                         const path = linkFormat === 'shortest' ? shortestPath :
@@ -229,8 +231,8 @@ export default class LinkerPlugin extends Plugin {
                                    absolutePath;
 
                         replacement = useMarkdownLinks ?
-                            `[${link.text}](${path})` :
-                            `[[${path}|${link.text}]]`;
+                            `[${sanitizedText}](${path})` :
+                            `[[${path}|${sanitizedText}]]`;
                     }
 
                     replacements.push({
@@ -386,19 +388,20 @@ export default class LinkerPlugin extends Plugin {
 
                                 // Create the replacement
                                 let replacement = '';
+                                const sanitizedText = text.replace(/[\[\]\|]/g, (match) => match === '|' ? ' ' : `\\${match}`);
 
                                 // If the file is the same as the shown text, and we can use short links, we use them
-                                if (replacementPath === text && linkFormat === 'shortest') {
+                                if (replacementPath === text && linkFormat === 'shortest' && !/[\[\]\|]/.test(replacementPath)) {
                                     replacement = `[[${replacementPath}]]`;
                                 }
                                 // Otherwise create a specific link, using the shown text
                                 else {
                                     if (linkFormat === 'shortest') {
-                                        replacement = createLink(shortestPath, text, useMarkdownLinks);
+                                        replacement = createLink(shortestPath, sanitizedText, useMarkdownLinks);
                                     } else if (linkFormat === 'relative') {
-                                        replacement = createLink(relativePath, text, useMarkdownLinks);
+                                        replacement = createLink(relativePath, sanitizedText, useMarkdownLinks);
                                     } else if (linkFormat === 'absolute') {
-                                        replacement = createLink(absolutePath, text, useMarkdownLinks);
+                                        replacement = createLink(absolutePath, sanitizedText, useMarkdownLinks);
                                     }
                                 }
 

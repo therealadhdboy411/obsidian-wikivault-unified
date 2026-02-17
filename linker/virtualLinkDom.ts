@@ -38,6 +38,12 @@ export class VirtualMatch {
 
     getLinkAnchorElement(linkText: string, href: string) {
         const link = document.createElement('a');
+
+        // Security check: Block javascript: URIs to prevent XSS
+        if (href.trim().toLowerCase().startsWith('javascript:')) {
+            href = 'about:blank';
+        }
+
         link.href = href;
         link.textContent = linkText;
         link.target = '_blank';
