@@ -12,3 +12,8 @@
 **Vulnerability:** User-configurable property names were used to access Obsidian frontmatter without validation. If set to a built-in JavaScript property like `constructor`, the plugin would attempt to iterate over a non-iterable value (the `Object` constructor), causing a crash during background indexing.
 **Learning:** Dynamic property access on objects populated from external data (like frontmatter) can be dangerous if the key matches built-in object members. This is a subtle form of prototype-related vulnerability that can lead to DoS.
 **Prevention:** Always validate that the value retrieved from an object using a dynamic key is of the expected type (e.g., `Array.isArray()`) before use. Additionally, maintain a blacklist of forbidden property names for user settings.
+
+## 2026-05-22 - Markdown and Wikilink Injection in Link Conversion
+**Vulnerability:** User-controlled text from notes was interpolated directly into Markdown and Wikilink syntax when converting virtual links to real links. This allowed for link breakage or content injection if the text contained characters like `]`, `[[`, or `|`.
+**Learning:** Even internal tool transformations must treat document content as untrusted when using it to build structured syntax. Markdown parsers are particularly sensitive to unescaped brackets in link text and unquoted spaces or parentheses in URLs.
+**Prevention:** Always sanitize link text by escaping brackets for Markdown and removing link-breaking characters for Wikilinks. Wrap Markdown URLs in `<...>` if they contain special characters (spaces or parentheses) to ensure they are parsed as a single unit according to CommonMark.
