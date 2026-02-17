@@ -2,7 +2,7 @@
 
 **WikiVault Unified** is a complete knowledge management system for Obsidian. It combines AI-powered note generation with advanced virtual linker technology to create a seamless, automated wiki experience within your vault.
 
-This plugin is a collaborative effort, building upon the foundations of **Virtual Linker** with significant enhancements and logic provided by **Claude** and **Manus**.
+This plugin is a collaborative effort, building upon the foundations of **Virtual Linker** with significant enhancements and logic provided by **Claude** and **Manus**. None of this was coded by a human - I personally can't code, but needed a solution to speed up my notes and make my notetaking more efficient. Human help would be greatly appreciated!
 
 ## Core Features
 
