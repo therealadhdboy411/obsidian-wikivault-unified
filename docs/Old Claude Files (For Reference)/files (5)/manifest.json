@@ -1,0 +1,10 @@
+{
+	"id": "obsidian-wikivault",
+	"name": "WikiVault",
+	"version": "2.0.0",
+	"minAppVersion": "0.15.0",
+	"description": "Automatically generates Wikipedia-like notes for missing Wikilinks with context extraction, dictionary definitions, AI summaries, plural detection, and batch processing with progress tracking.",
+	"author": "Manus",
+	"authorUrl": "https://manus.im",
+	"isDesktopOnly": false
+}

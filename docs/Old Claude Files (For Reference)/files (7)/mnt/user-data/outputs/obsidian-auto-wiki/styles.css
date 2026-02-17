@@ -1,0 +1,39 @@
+/* Auto Wiki Plugin Styles */
+
+/* Settings page styling */
+.auto-wiki-settings {
+    padding: 20px;
+}
+
+.auto-wiki-settings h2 {
+    margin-top: 0;
+    border-bottom: 1px solid var(--background-modifier-border);
+    padding-bottom: 10px;
+}
+
+.auto-wiki-settings h3 {
+    margin-top: 20px;
+    color: var(--text-muted);
+}
+
+/* Notice styling for better visibility */
+.notice.auto-wiki-notice {
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+}
+
+/* Optional: Style for generated wiki pages */
+.auto-wiki-summary {
+    background-color: var(--background-secondary);
+    padding: 10px;
+    border-left: 3px solid var(--interactive-accent);
+    margin: 10px 0;
+}
+
+.auto-wiki-see-also {
+    background-color: var(--background-secondary);
+    padding: 10px;
+    border-left: 3px solid var(--text-accent);
+    margin: 10px 0;
+    font-style: italic;
+}

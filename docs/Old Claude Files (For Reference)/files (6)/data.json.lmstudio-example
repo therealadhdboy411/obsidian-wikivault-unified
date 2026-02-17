@@ -1,0 +1,12 @@
+{
+  "apiProvider": "lmstudio",
+  "openaiEndpoint": "http://localhost:1234",
+  "openaiApiKey": "",
+  "modelName": "llama-3.2-3b-instruct",
+  "similarityThreshold": 0.7,
+  "runOnStartup": false,
+  "runOnFileSwitch": true,
+  "useCustomDirectory": true,
+  "customDirectoryName": "Vault Wiki",
+  "showProgressNotification": true
+}

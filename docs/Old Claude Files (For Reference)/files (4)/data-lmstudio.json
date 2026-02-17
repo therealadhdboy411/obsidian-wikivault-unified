@@ -1,0 +1,14 @@
+{
+  "apiProvider": "lmstudio",
+  "openaiEndpoint": "https://api.openai.com/v1",
+  "openaiApiKey": "",
+  "modelName": "model-identifier",
+  "lmstudioEndpoint": "http://localhost:1234",
+  "lmstudioApiKey": "",
+  "similarityThreshold": 0.7,
+  "runOnStartup": true,
+  "runOnFileSwitch": true,
+  "useCustomDirectory": true,
+  "customDirectoryName": "Vault Wiki",
+  "showProgressNotification": false
+}

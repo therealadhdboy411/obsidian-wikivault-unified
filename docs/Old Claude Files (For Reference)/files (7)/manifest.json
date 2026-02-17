@@ -1,0 +1,10 @@
+{
+  "id": "wikilink-generator",
+  "name": "WikiLink Generator",
+  "version": "1.0.0",
+  "minAppVersion": "0.15.0",
+  "description": "Automatically generates Wikipedia-style notes for missing wikilinks with AI-powered summaries and context extraction",
+  "author": "Your Name",
+  "authorUrl": "https://github.com/yourusername",
+  "isDesktopOnly": false
+}

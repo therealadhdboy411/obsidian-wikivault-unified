@@ -1,0 +1,8 @@
+/* Optional styles for WikiLink Generator plugin */
+
+/* Style for generated "See also" callouts */
+.callout[data-callout="note"] {
+    /* Inherits Obsidian's default callout styling */
+}
+
+/* You can add custom styles here if needed */
