@@ -1,4 +1,4 @@
-import { App, EditorPosition, MarkdownView, Menu, Plugin, PluginSettingTab, Setting, TAbstractFile, TFile, TFolder } from 'obsidian';
+import { App, EditorPosition, MarkdownView, Menu, Notice, Plugin, PluginSettingTab, Setting, TAbstractFile, TFile, TFolder } from 'obsidian';
 
 import { GlossaryLinker } from './linker/readModeLinker';
 import { liveLinkerPlugin } from './linker/liveLinker';
@@ -118,6 +118,7 @@ export default class LinkerPlugin extends Plugin {
                     if (!checking) {
                         this.updateSettings({ linkerActivated: true });
                         this.updateManager.update();
+                        new Notice('Virtual Linker activated.');
                     }
                     return true;
                 }
@@ -133,6 +134,7 @@ export default class LinkerPlugin extends Plugin {
                     if (!checking) {
                         this.updateSettings({ linkerActivated: false });
                         this.updateManager.update();
+                        new Notice('Virtual Linker deactivated.');
                     }
                     return true;
                 }
@@ -181,7 +183,10 @@ export default class LinkerPlugin extends Plugin {
                     })
                     .sort((a, b) => a.from - b.from);
 
-                if (virtualLinks.length === 0) return;
+                if (virtualLinks.length === 0) {
+                    new Notice('No virtual links found in the selection.');
+                    return;
+                }
 
                 // Process all links in a single operation
                 const replacements: {from: number, to: number, text: string}[] = [];
@@ -246,6 +251,7 @@ export default class LinkerPlugin extends Plugin {
                     const toPos = editor.offsetToPos(replacement.to);
                     editor.replaceRange(replacement.text, fromPos, toPos);
                 }
+                new Notice(`Converted ${replacements.length} virtual links to real links.`);
             }
         });
 
@@ -413,6 +419,7 @@ export default class LinkerPlugin extends Plugin {
                                 }
 
                                 editor?.replaceRange(replacement, fromEditorPos, toEditorPos);
+                                new Notice('Converted virtual link to real link.');
                             });
                     });
                 }
@@ -471,6 +478,7 @@ export default class LinkerPlugin extends Plugin {
                                 });
 
                                 updateManager.update();
+                                new Notice('File excluded from virtual linker.');
                             }
                         });
                 });
@@ -524,6 +532,7 @@ export default class LinkerPlugin extends Plugin {
                                 });
 
                                 updateManager.update();
+                                new Notice('File included in virtual linker.');
                             }
                         });
                 });
@@ -559,6 +568,7 @@ export default class LinkerPlugin extends Plugin {
                             await this.updateSettings({ linkerDirectories: newIncludedDirs, excludedDirectories: newExcludedDirs });
 
                             updateManager.update();
+                            new Notice('Directory excluded from virtual linker.');
                         });
                 });
             } else if ((!fetcher.includeAllFiles && !isInIncludedDir) || isInExcludedDir) {
@@ -583,6 +593,7 @@ export default class LinkerPlugin extends Plugin {
                             await this.updateSettings({ linkerDirectories: newIncludedDirs, excludedDirectories: newExcludedDirs });
 
                             updateManager.update();
+                            new Notice('Directory included in virtual linker.');
                         });
                 });
             }
@@ -803,28 +814,19 @@ class LinkerSettingTab extends PluginSettingTab {
             );
 
         if (this.plugin.settings.advancedSettings) {
-            // Number input setting for capital letter proportion for automatic match case
+            // Slider setting for capital letter proportion for automatic match case
             new Setting(containerEl)
                 .setName('Capital letter percentage for automatic match case')
                 .setDesc(
-                    'The percentage (0 - 100) of capital letters in a file name or alias to be automatically considered as case sensitive.'
+                    'The percentage of capital letters in a file name or alias to be automatically considered as case sensitive.'
                 )
-                .addText((text) =>
-                    text
-                        .setValue((this.plugin.settings.capitalLetterProportionForAutomaticMatchCase * 100).toFixed(1))
+                .addSlider((slider) =>
+                    slider
+                        .setLimits(0, 100, 1)
+                        .setValue(Math.round(this.plugin.settings.capitalLetterProportionForAutomaticMatchCase * 100))
+                        .setDynamicTooltip()
                         .onChange(async (value) => {
-                            let newValue = parseFloat(value);
-                            if (isNaN(newValue)) {
-                                newValue = 75;
-                            } else if (newValue < 0) {
-                                newValue = 0;
-                            } else if (newValue > 100) {
-                                newValue = 100;
-                            }
-                            newValue /= 100;
-
-                            // console.log("New capital letter proportion for automatic match case: " + newValue);
-                            await this.plugin.updateSettings({ capitalLetterProportionForAutomaticMatchCase: newValue });
+                            await this.plugin.updateSettings({ capitalLetterProportionForAutomaticMatchCase: value / 100 });
                         })
                 );
 
