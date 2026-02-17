@@ -45,6 +45,7 @@ export class VirtualMatch {
         link.setAttribute('from', this.from.toString());
         link.setAttribute('to', this.to.toString());
         link.setAttribute('origin-text', this.originText);
+        link.setAttribute('aria-label', `${linkText} (virtual link)`);
         link.classList.add('internal-link', 'virtual-link-a');
         return link;
     }
@@ -98,6 +99,7 @@ export class VirtualMatch {
         const spanIndicator = document.createElement('span');
         spanIndicator.textContent = ' [...]';
         spanIndicator.classList.add('multiple-files-indicator');
+        spanIndicator.setAttribute('aria-label', 'Multiple matches available');
         return spanIndicator;
     }
 
@@ -107,6 +109,8 @@ export class VirtualMatch {
             let icon = document.createElement('sup');
             icon.textContent = suffix;
             icon.classList.add('linker-suffix-icon');
+            icon.title = 'Virtual link';
+            icon.setAttribute('aria-hidden', 'true');
             return icon;
         }
         return null;

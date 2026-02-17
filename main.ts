@@ -1,4 +1,4 @@
-import { App, EditorPosition, MarkdownView, Menu, Plugin, PluginSettingTab, Setting, TAbstractFile, TFile, TFolder } from 'obsidian';
+import { App, EditorPosition, MarkdownView, Menu, Notice, Plugin, PluginSettingTab, Setting, TAbstractFile, TFile, TFolder } from 'obsidian';
 
 import { GlossaryLinker } from './linker/readModeLinker';
 import { liveLinkerPlugin } from './linker/liveLinker';
@@ -246,6 +246,10 @@ export default class LinkerPlugin extends Plugin {
                     const toPos = editor.offsetToPos(replacement.to);
                     editor.replaceRange(replacement.text, fromPos, toPos);
                 }
+
+                if (replacements.length > 0) {
+                    new Notice(`Successfully converted ${replacements.length} virtual links.`);
+                }
             }
         });
 
@@ -300,19 +304,14 @@ export default class LinkerPlugin extends Plugin {
                 // Check, if we are clicking on a virtual link inside a note or a note in the file explorer
                 const isVirtualLink = targetElement.classList.contains('virtual-link-a');
 
-                const from = parseInt(targetElement.getAttribute('from') || '-1');
-                const to = parseInt(targetElement.getAttribute('to') || '-1');
+                if (isVirtualLink) {
+                    const from = parseInt(targetElement.getAttribute('from') || '-1');
+                    const to = parseInt(targetElement.getAttribute('to') || '-1');
 
-                if (from === -1 || to === -1) {
-                    menu.addItem((item) => {
-                        // Item to convert a virtual link to a real link
-                        item.setTitle(
-                            '[Virtual Linker] Converting link is not here.'
-                        ).setIcon('link');
-                    });
-                }
-                // Check, if the element has the "virtual-link" class
-                else if (isVirtualLink) {
+                    if (from === -1 || to === -1) {
+                        return;
+                    }
+
                     menu.addItem((item) => {
                         // Item to convert a virtual link to a real link
                         item.setTitle('[Virtual Linker] Convert to real link')
@@ -413,6 +412,7 @@ export default class LinkerPlugin extends Plugin {
                                 }
 
                                 editor?.replaceRange(replacement, fromEditorPos, toEditorPos);
+                                new Notice('Converted virtual link to real link.');
                             });
                     });
                 }
