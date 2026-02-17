@@ -7,3 +7,8 @@
 **Vulnerability:** A realistic-looking API key (Mistral AI) was found in a documentation file (`docs/CHANGES_SUMMARY.md`).
 **Learning:** Even if intended as an example, hardcoded keys can be accidentally used or leaked. Documentation files are often overlooked during security audits but are part of the repository.
 **Prevention:** Use clear placeholders like `your-api-key-here` or `sk-placeholder` in all repository files, including documentation and examples.
+
+## 2026-02-17 - Denial of Service via Frontmatter Property Access
+**Vulnerability:** User-configurable property names were used to access Obsidian frontmatter without validation. If set to a built-in JavaScript property like `constructor`, the plugin would attempt to iterate over a non-iterable value (the `Object` constructor), causing a crash during background indexing.
+**Learning:** Dynamic property access on objects populated from external data (like frontmatter) can be dangerous if the key matches built-in object members. This is a subtle form of prototype-related vulnerability that can lead to DoS.
+**Prevention:** Always validate that the value retrieved from an object using a dynamic key is of the expected type (e.g., `Array.isArray()`) before use. Additionally, maintain a blacklist of forbidden property names for user settings.
