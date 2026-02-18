@@ -5,3 +5,7 @@
 ## 2025-05-15 - [Regex Overhead]
 **Learning:** Creating regex instances inside frequently called static methods like `checkWordBoundary` introduces significant overhead during document scanning.
 **Action:** Hoist frequently used regexes to static constants.
+
+## 2025-05-23 - [Collection Overhead in Hot Path]
+**Learning:** Frequent conversion between `Set` and `Array` (using `Array.from`) and repeated object allocations in character-by-character loops are major bottlenecks. Combining filtering and transformation into a single pass over collections significantly reduces CPU time.
+**Action:** Use arrays for transient result sets and pre-calculate/cache static properties (like string length or lowercase versions) on trie nodes.
