@@ -11,7 +11,7 @@ export class VirtualMatch {
         public files: TFile[],
         public isAlias: boolean,
         public isSubWord: boolean,
-        public settings: LinkerPluginSettings
+        public settings: LinkerPluginSettings,
     ) {}
 
     /////////////////////////////////////////////////
@@ -20,7 +20,7 @@ export class VirtualMatch {
 
     getCompleteLinkElement() {
         const span = this.getLinkRootSpan();
-        const firstPath = this.files.length > 0 ? this.files[0].path: ""; 
+        const firstPath = this.files.length > 0 ? this.files[0].path : '';
         span.appendChild(this.getLinkAnchorElement(this.originText, firstPath));
         if (this.files.length > 1) {
             if (!this.isSubWord) {
@@ -36,7 +36,7 @@ export class VirtualMatch {
         return span;
     }
 
-    getLinkAnchorElement(linkText: string, href: string) {
+    getLinkAnchorElement(linkText: string, href: string, ariaLabel?: string) {
         const link = document.createElement('a');
         // Security: Prevent javascript: protocol links to avoid XSS
         if (href.trim().toLowerCase().startsWith('javascript:')) {
@@ -44,6 +44,9 @@ export class VirtualMatch {
         }
         link.href = href;
         link.textContent = linkText;
+        if (ariaLabel) {
+            link.setAttribute('aria-label', ariaLabel);
+        }
         link.target = '_blank';
         link.rel = 'noopener noreferrer';
         link.setAttribute('from', this.from.toString());
@@ -70,8 +73,6 @@ export class VirtualMatch {
 
         files = files ?? this.files;
 
-
-
         files.forEach((file, index) => {
             if (index === 0) {
                 const bracket = document.createElement('span');
@@ -84,8 +85,8 @@ export class VirtualMatch {
                 linkText += '|';
             }
 
-            let linkHref = file.path;
-            const link = this.getLinkAnchorElement(linkText, linkHref);
+            const linkHref = file.path;
+            const link = this.getLinkAnchorElement(linkText, linkHref, `Link to ${file.basename}`);
             spanReferences.appendChild(link);
 
             if (index == files!.length - 1) {
@@ -108,8 +109,10 @@ export class VirtualMatch {
     getIconSpan() {
         const suffix = this.isAlias ? this.settings.virtualLinkAliasSuffix : this.settings.virtualLinkSuffix;
         if ((suffix?.length ?? 0) > 0) {
-            let icon = document.createElement('sup');
+            const icon = document.createElement('sup');
             icon.textContent = suffix;
+            icon.setAttribute('aria-hidden', 'true');
+            icon.title = 'Virtual link';
             icon.classList.add('linker-suffix-icon');
             return icon;
         }
@@ -144,7 +147,7 @@ export class VirtualMatch {
         });
     }
 
-    static filterOverlapping(matches: VirtualMatch[], onlyLinkOnce: boolean = true, excludedIntervalTree?: IntervalTree): VirtualMatch[] {
+    static filterOverlapping(matches: VirtualMatch[], onlyLinkOnce = true, excludedIntervalTree?: IntervalTree): VirtualMatch[] {
         const matchesToDelete: Map<number, boolean> = new Map();
 
         // Delete additions that overlap
