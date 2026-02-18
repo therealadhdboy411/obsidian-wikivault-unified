@@ -19,7 +19,7 @@ export class LinkerFileMetaInfo {
 
         const settings = this.fetcher.settings;
 
-        this.tags = (getAllTags(this.fetcher.app.metadataCache.getFileCache(this.file)!!) ?? [])
+        this.tags = (getAllTags(this.fetcher.app.metadataCache.getFileCache(this.file)!) ?? [])
             .filter(tag => tag.trim().length > 0)
             .map(tag => tag.startsWith("#") ? tag.slice(1) : tag);
 

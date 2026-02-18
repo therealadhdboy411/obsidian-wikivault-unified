@@ -8,7 +8,7 @@ import { LinkerPluginSettings } from 'main';
 import { ExternalUpdateManager, LinkerCache, PrefixTree } from './linkerCache';
 import { VirtualMatch } from './virtualLinkDom';
 
-function isDescendant(parent: HTMLElement, child: HTMLElement, maxDepth: number = 10) {
+function isDescendant(parent: HTMLElement, child: HTMLElement, maxDepth = 10) {
     let node = child.parentNode;
     let depth = 0;
     while (node != null && depth < maxDepth) {
@@ -38,8 +38,8 @@ class AutoLinkerPlugin implements PluginValue {
 
     settings: LinkerPluginSettings;
 
-    private lastCursorPos: number = 0;
-    private lastActiveFile: string = '';
+    private lastCursorPos = 0;
+    private lastActiveFile = '';
     private lastViewUpdate: ViewUpdate | null = null;
 
     viewUpdateDomToFileMap: Map<HTMLElement, TFile | undefined | null> = new Map();
@@ -62,7 +62,7 @@ class AutoLinkerPlugin implements PluginValue {
         });
     }
 
-    update(update: ViewUpdate, force: boolean = false) {
+    update(update: ViewUpdate, force = false) {
         const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
 
         // Check if the update is on the active view. We only need to check this, if one of the following settings is enabled
@@ -97,7 +97,7 @@ class AutoLinkerPlugin implements PluginValue {
 
     destroy() {}
 
-    buildDecorations(view: EditorView, viewIsActive: boolean = true): DecorationSet {
+    buildDecorations(view: EditorView, viewIsActive = true): DecorationSet {
         const builder = new RangeSetBuilder<Decoration>();
 
         if (!this.settings.linkerActivated) {
@@ -120,7 +120,7 @@ class AutoLinkerPlugin implements PluginValue {
         // Set to exclude files that are already linked by a virtual link
         const alreadyLinkedFiles = new Set<TFile>();
 
-        for (let { from, to } of view.visibleRanges) {
+        for (const { from, to } of view.visibleRanges) {
             this.linkerCache.reset();
             const text = view.state.doc.sliceString(from, to);
 
@@ -166,7 +166,7 @@ class AutoLinkerPlugin implements PluginValue {
                             // console.log("MATCH", name, aFrom, aTo, node.caseIsMatched, node.requiresCaseMatch)
 
                             matches.push(
-                                new VirtualMatch(id++, name, aFrom, aTo, Array.from(node.files), isAlias, !isWordBoundary, this.settings)
+                                new VirtualMatch(id++, name, aFrom, aTo, node.files, isAlias, !isWordBoundary, this.settings)
                             );
                         }
                     }
@@ -264,8 +264,8 @@ class AutoLinkerPlugin implements PluginValue {
                 if (fixIMEProblem) {
                     needImeFix = true;
                     if (additionIsInCurrentLine && cursorPos > to) {
-                        let gapString = view.state.sliceDoc(to, cursorPos);
-                        let strBeforeAdd = view.state.sliceDoc(lineStart, from);
+                        const gapString = view.state.sliceDoc(to, cursorPos);
+                        const strBeforeAdd = view.state.sliceDoc(lineStart, from);
 
                         // Regex to check if a part of a word is at the line start, because IME problem only occurs at line start
                         // Regex matches parts that:
