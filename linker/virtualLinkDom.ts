@@ -36,7 +36,7 @@ export class VirtualMatch {
         return span;
     }
 
-    getLinkAnchorElement(linkText: string, href: string) {
+    getLinkAnchorElement(linkText: string, href: string, ariaLabel?: string, title?: string) {
         const link = document.createElement('a');
         // Security: Prevent javascript: protocol links to avoid XSS
         if (href.trim().toLowerCase().startsWith('javascript:')) {
@@ -50,6 +50,12 @@ export class VirtualMatch {
         link.setAttribute('to', this.to.toString());
         link.setAttribute('origin-text', this.originText);
         link.classList.add('internal-link', 'virtual-link-a');
+
+        const fileName = href.split('/').pop() || href;
+        const defaultLabel = `Virtual link to ${fileName}`;
+        link.setAttribute('aria-label', ariaLabel || defaultLabel);
+        link.title = title || defaultLabel;
+
         return link;
     }
 
@@ -84,8 +90,11 @@ export class VirtualMatch {
                 linkText += '|';
             }
 
-            let linkHref = file.path;
-            const link = this.getLinkAnchorElement(linkText, linkHref);
+            const linkHref = file.path;
+            const fileName = file.basename || file.path.split('/').pop() || file.path;
+            const linkAriaLabel = `Reference ${index + 1}: ${fileName}`;
+            const linkTitle = `Go to reference ${index + 1}: ${fileName}`;
+            const link = this.getLinkAnchorElement(linkText, linkHref, linkAriaLabel, linkTitle);
             spanReferences.appendChild(link);
 
             if (index == files!.length - 1) {
@@ -102,6 +111,8 @@ export class VirtualMatch {
         const spanIndicator = document.createElement('span');
         spanIndicator.textContent = ' [...]';
         spanIndicator.classList.add('multiple-files-indicator');
+        spanIndicator.setAttribute('aria-label', 'Multiple references available');
+        spanIndicator.title = 'Multiple references available';
         return spanIndicator;
     }
 
