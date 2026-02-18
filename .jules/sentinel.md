@@ -17,3 +17,8 @@
 **Vulnerability:** User-controlled text from notes was interpolated directly into Markdown and Wikilink syntax when converting virtual links to real links. This allowed for link breakage or content injection if the text contained characters like `]`, `[[`, or `|`.
 **Learning:** Even internal tool transformations must treat document content as untrusted when using it to build structured syntax. Markdown parsers are particularly sensitive to unescaped brackets in link text and unquoted spaces or parentheses in URLs.
 **Prevention:** Always sanitize link text by escaping brackets for Markdown and removing link-breaking characters for Wikilinks. Wrap Markdown URLs in `<...>` if they contain special characters (spaces or parentheses) to ensure they are parsed as a single unit according to CommonMark.
+
+## 2026-05-23 - Exposure of Sensitive API Keys in Settings UI
+**Vulnerability:** API keys for OpenAI and LM Studio were displayed in plain text within the Obsidian settings tab. This posed a risk of accidental exposure during screen sharing, screen recordings, or shoulder surfing.
+**Learning:** Standard UI components (like Obsidian's `addText`) default to plain text. Security-sensitive fields must be explicitly configured to mask input.
+**Prevention:** Always set `text.inputEl.type = 'password'` for any setting component that handles credentials or sensitive tokens.
