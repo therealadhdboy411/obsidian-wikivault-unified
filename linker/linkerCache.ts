@@ -28,6 +28,7 @@ export class PrefixNode {
     files: Set<TFile> = new Set();
     charValue: string = '';
     value: string = '';
+    lowerCaseValue: string = '';
     requiresCaseMatch: boolean = false;
 }
 
@@ -46,7 +47,7 @@ export class VisitedPrefixNode {
 export class MatchNode {
     start: number = 0;
     length: number = 0;
-    files: Set<TFile> = new Set();
+    files: TFile[] = [];
     value: string = '';
     isAlias: boolean = false;
     caseIsMatched: boolean = true;
@@ -85,59 +86,65 @@ export class PrefixTree {
     }
 
     getCurrentMatchNodes(index: number, excludedNote?: TFile | null): MatchNode[] {
+        if (this._currentNodes.length === 0) {
+            return [];
+        }
+
         const matchNodes: MatchNode[] = [];
 
         if (excludedNote === undefined && this.settings.excludeLinksToOwnNote) {
             excludedNote = this.app.workspace.getActiveFile();
         }
+        const excludedPath = excludedNote?.path;
 
         // From the current nodes in the trie, get all nodes that have files
-        for (const node of this._currentNodes) {
-            if (node.node.files.size === 0) {
-                continue;
-            }
-            const matchNode = new MatchNode();
-            matchNode.length = node.node.value.length + node.formattingDelta;
-            matchNode.start = index - matchNode.length;
+        for (const visitedNode of this._currentNodes) {
+            const node = visitedNode.node;
+            const files = node.files;
 
-            if (excludedNote) {
-                matchNode.files = new Set(Array.from(node.node.files).filter((file) => file.path !== excludedNote!.path));
-            } else {
-                matchNode.files = node.node.files;
-            }
-
-            if (matchNode.files.size === 0) {
+            if (files.size === 0) {
                 continue;
             }
 
-            matchNode.value = node.node.value;
-            matchNode.requiresCaseMatch = node.node.requiresCaseMatch;
+            if (node.requiresCaseMatch && !visitedNode.caseIsMatched) {
+                continue;
+            }
 
-            const nodeValueLower = node.node.value.toLowerCase();
-            let isAlias = true;
-            for (const file of matchNode.files) {
-                if (file.basename.toLowerCase() === nodeValueLower) {
-                    isAlias = false;
-                    break;
+            const filteredFiles: TFile[] = [];
+            let hasPrimaryName = false;
+            const nodeValueLower = node.lowerCaseValue;
+
+            for (const file of files) {
+                if (file.path === excludedPath) {
+                    continue;
+                }
+                filteredFiles.push(file);
+                if (!hasPrimaryName && file.basename.toLowerCase() === nodeValueLower) {
+                    hasPrimaryName = true;
                 }
             }
-            matchNode.isAlias = isAlias;
 
-            // Check if the case is matched
-            matchNode.caseIsMatched = node.caseIsMatched;
-
-            // Check if the match starts at a word boundary
-            matchNode.startsAtWordBoundary = node.startedAtWordBeginning;
-
-            if (matchNode.requiresCaseMatch && !matchNode.caseIsMatched) {
+            if (filteredFiles.length === 0) {
                 continue;
             }
+
+            const matchNode = new MatchNode();
+            matchNode.length = node.value.length + visitedNode.formattingDelta;
+            matchNode.start = index - matchNode.length;
+            matchNode.files = filteredFiles;
+            matchNode.value = node.value;
+            matchNode.isAlias = !hasPrimaryName;
+            matchNode.caseIsMatched = visitedNode.caseIsMatched;
+            matchNode.startsAtWordBoundary = visitedNode.startedAtWordBeginning;
+            matchNode.requiresCaseMatch = node.requiresCaseMatch;
 
             matchNodes.push(matchNode);
         }
 
-        // Sort nodes by length
-        matchNodes.sort((a, b) => b.length - a.length);
+        // Sort nodes by length if there is more than one match
+        if (matchNodes.length > 1) {
+            matchNodes.sort((a, b) => b.length - a.length);
+        }
 
         return matchNodes;
     }
@@ -146,7 +153,7 @@ export class PrefixTree {
         let node = this.root;
 
         // For each character in the name, add a node to the trie
-        for (let char of name) {
+        for (const char of name) {
             // char = char.toLowerCase();
             let child = node.children.get(char);
             if (!child) {
@@ -154,6 +161,7 @@ export class PrefixTree {
                 child.parent = node;
                 child.charValue = char;
                 child.value = node.value + char;
+                child.lowerCaseValue = child.value.toLowerCase();
                 node.children.set(char, child);
             }
             node = child;
