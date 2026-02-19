@@ -86,6 +86,8 @@ export class VirtualMatch {
 
             let linkHref = file.path;
             const link = this.getLinkAnchorElement(linkText, linkHref);
+            link.setAttribute('aria-label', `Reference ${index + 1}: ${file.basename}`);
+            link.title = `Reference ${index + 1}: ${file.basename}`;
             spanReferences.appendChild(link);
 
             if (index == files!.length - 1) {
@@ -101,6 +103,8 @@ export class VirtualMatch {
     getMultipleReferencesIndicatorSpan() {
         const spanIndicator = document.createElement('span');
         spanIndicator.textContent = ' [...]';
+        spanIndicator.setAttribute('aria-label', 'Multiple references available');
+        spanIndicator.title = 'Multiple references available';
         spanIndicator.classList.add('multiple-files-indicator');
         return spanIndicator;
     }
