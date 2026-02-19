@@ -1473,36 +1473,40 @@ class LinkerSettingTab extends PluginSettingTab {
                 .setDesc('For example: https://api.openai.com/v1 or https://api.mistral.ai/v1')
                 .addText((text) =>
                     text.setValue(this.plugin.settings.openaiEndpoint).onChange(async (value) => {
-                        await this.plugin.updateSettings({ openaiEndpoint: value });
+                        const sanitized = value.endsWith('/') ? value.slice(0, -1) : value;
+                        await this.plugin.updateSettings({ openaiEndpoint: sanitized });
                     })
                 );
 
             new Setting(containerEl)
                 .setName('OpenAI API key')
                 .setDesc('API key used for OpenAI-compatible providers.')
-                .addText((text) =>
+                .addText((text) => {
+                    text.inputEl.type = 'password';
                     text.setValue(this.plugin.settings.openaiApiKey).onChange(async (value) => {
                         await this.plugin.updateSettings({ openaiApiKey: value });
-                    })
-                );
+                    });
+                });
         } else {
             new Setting(containerEl)
                 .setName('LM Studio endpoint')
                 .setDesc('Default LM Studio local server: http://localhost:1234')
                 .addText((text) =>
                     text.setValue(this.plugin.settings.lmstudioEndpoint).onChange(async (value) => {
-                        await this.plugin.updateSettings({ lmstudioEndpoint: value });
+                        const sanitized = value.endsWith('/') ? value.slice(0, -1) : value;
+                        await this.plugin.updateSettings({ lmstudioEndpoint: sanitized });
                     })
                 );
 
             new Setting(containerEl)
                 .setName('LM Studio API key (optional)')
                 .setDesc('Leave empty unless authentication is enabled in LM Studio.')
-                .addText((text) =>
+                .addText((text) => {
+                    text.inputEl.type = 'password';
                     text.setValue(this.plugin.settings.lmstudioApiKey).onChange(async (value) => {
                         await this.plugin.updateSettings({ lmstudioApiKey: value });
-                    })
-                );
+                    });
+                });
         }
 
         new Setting(containerEl)
@@ -1540,7 +1544,9 @@ class LinkerSettingTab extends PluginSettingTab {
                 .setDesc('Folder where generated notes are created/updated.')
                 .addText((text) =>
                     text.setValue(this.plugin.settings.customDirectoryName).onChange(async (value) => {
-                        await this.plugin.updateSettings({ customDirectoryName: value });
+                        // Sanitize directory name to prevent path traversal
+                        const sanitized = value.replace(/\.\./g, '').replace(/[\\/]+/g, '/').replace(/^\/|\/$/g, '');
+                        await this.plugin.updateSettings({ customDirectoryName: sanitized || 'WikiVault' });
                     })
                 );
         }
