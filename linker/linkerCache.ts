@@ -46,7 +46,7 @@ export class VisitedPrefixNode {
 export class MatchNode {
     start: number = 0;
     length: number = 0;
-    files: Set<TFile> = new Set();
+    files: TFile[] = [];
     value: string = '';
     isAlias: boolean = false;
     caseIsMatched: boolean = true;
@@ -91,53 +91,56 @@ export class PrefixTree {
             excludedNote = this.app.workspace.getActiveFile();
         }
 
+        const excludedPath = excludedNote?.path;
+
         // From the current nodes in the trie, get all nodes that have files
         for (const node of this._currentNodes) {
             if (node.node.files.size === 0) {
                 continue;
             }
+
+            // Optimization: Skip nodes that require case match but don't have it early
+            if (node.node.requiresCaseMatch && !node.caseIsMatched) {
+                continue;
+            }
+
+            // Optimization: Single pass for filtering and alias detection
+            // This avoids multiple iterations over node.node.files and extra Set/Array allocations
+            const filteredFiles: TFile[] = [];
+            const nodeValueLower = node.node.value.toLowerCase();
+            let isAlias = true;
+
+            for (const file of node.node.files) {
+                if (excludedPath && file.path === excludedPath) {
+                    continue;
+                }
+                filteredFiles.push(file);
+                if (isAlias && file.basename.toLowerCase() === nodeValueLower) {
+                    isAlias = false;
+                }
+            }
+
+            if (filteredFiles.length === 0) {
+                continue;
+            }
+
             const matchNode = new MatchNode();
             matchNode.length = node.node.value.length + node.formattingDelta;
             matchNode.start = index - matchNode.length;
-
-            if (excludedNote) {
-                matchNode.files = new Set(Array.from(node.node.files).filter((file) => file.path !== excludedNote!.path));
-            } else {
-                matchNode.files = node.node.files;
-            }
-
-            if (matchNode.files.size === 0) {
-                continue;
-            }
-
+            matchNode.files = filteredFiles;
             matchNode.value = node.node.value;
             matchNode.requiresCaseMatch = node.node.requiresCaseMatch;
-
-            const nodeValueLower = node.node.value.toLowerCase();
-            let isAlias = true;
-            for (const file of matchNode.files) {
-                if (file.basename.toLowerCase() === nodeValueLower) {
-                    isAlias = false;
-                    break;
-                }
-            }
             matchNode.isAlias = isAlias;
-
-            // Check if the case is matched
             matchNode.caseIsMatched = node.caseIsMatched;
-
-            // Check if the match starts at a word boundary
             matchNode.startsAtWordBoundary = node.startedAtWordBeginning;
-
-            if (matchNode.requiresCaseMatch && !matchNode.caseIsMatched) {
-                continue;
-            }
 
             matchNodes.push(matchNode);
         }
 
-        // Sort nodes by length
-        matchNodes.sort((a, b) => b.length - a.length);
+        // Sort nodes by length - only if there's more than one to sort
+        if (matchNodes.length > 1) {
+            matchNodes.sort((a, b) => b.length - a.length);
+        }
 
         return matchNodes;
     }

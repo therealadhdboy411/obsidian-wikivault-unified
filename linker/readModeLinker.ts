@@ -123,7 +123,7 @@ export class GlossaryLinker extends MarkdownRenderChild {
                                                 name,
                                                 nFrom,
                                                 nTo,
-                                                Array.from(node.files),
+                                                node.files,
                                                 node.isAlias,
                                                 !isWordBoundary,
                                                 this.settings
