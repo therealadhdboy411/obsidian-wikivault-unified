@@ -17,3 +17,8 @@
 **Vulnerability:** User-controlled text from notes was interpolated directly into Markdown and Wikilink syntax when converting virtual links to real links. This allowed for link breakage or content injection if the text contained characters like `]`, `[[`, or `|`.
 **Learning:** Even internal tool transformations must treat document content as untrusted when using it to build structured syntax. Markdown parsers are particularly sensitive to unescaped brackets in link text and unquoted spaces or parentheses in URLs.
 **Prevention:** Always sanitize link text by escaping brackets for Markdown and removing link-breaking characters for Wikilinks. Wrap Markdown URLs in `<...>` if they contain special characters (spaces or parentheses) to ensure they are parsed as a single unit according to CommonMark.
+
+## 2026-05-23 - Path Traversal in Custom Directory Settings
+**Vulnerability:** User-configurable directory names (like `customDirectoryName`) were used to build file paths without sanitization. This could allow overwriting sensitive files within the vault (e.g., `.obsidian/plugins/...`) if the directory name contained `..` or leading slashes.
+**Learning:** Even within the restricted environment of an Obsidian vault, path traversal can lead to "vandalism" or accidental corruption of plugin files and configurations if directory settings are not sanitized.
+**Prevention:** Sanitize user-provided directory names by removing `..` and normalizing slashes (e.g., using `.replace(/\.\./g, '').replace(/[\\/]+/g, '/').replace(/^\/|\/$/g, '')`).

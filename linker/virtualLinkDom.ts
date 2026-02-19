@@ -76,21 +76,26 @@ export class VirtualMatch {
             if (index === 0) {
                 const bracket = document.createElement('span');
                 bracket.textContent = this.isSubWord ? '[' : ' [';
+                bracket.setAttribute('aria-hidden', 'true');
                 spanReferences.appendChild(bracket);
             }
 
             let linkText = ` ${index + 1} `;
-            if (index < files!.length - 1) {
-                linkText += '|';
-            }
-
             let linkHref = file.path;
             const link = this.getLinkAnchorElement(linkText, linkHref);
             spanReferences.appendChild(link);
 
+            if (index < files!.length - 1) {
+                const separator = document.createElement('span');
+                separator.textContent = '|';
+                separator.setAttribute('aria-hidden', 'true');
+                spanReferences.appendChild(separator);
+            }
+
             if (index == files!.length - 1) {
                 const bracket = document.createElement('span');
                 bracket.textContent = ']';
+                bracket.setAttribute('aria-hidden', 'true');
                 spanReferences.appendChild(bracket);
             }
         });
@@ -102,6 +107,8 @@ export class VirtualMatch {
         const spanIndicator = document.createElement('span');
         spanIndicator.textContent = ' [...]';
         spanIndicator.classList.add('multiple-files-indicator');
+        spanIndicator.setAttribute('aria-label', 'Multiple references available');
+        spanIndicator.setAttribute('title', 'Multiple references available');
         return spanIndicator;
     }
 
@@ -111,6 +118,7 @@ export class VirtualMatch {
             let icon = document.createElement('sup');
             icon.textContent = suffix;
             icon.classList.add('linker-suffix-icon');
+            icon.setAttribute('aria-label', 'Virtual link indicator');
             return icon;
         }
         return null;
