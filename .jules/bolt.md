@@ -5,3 +5,7 @@
 ## 2025-05-15 - [Regex Overhead]
 **Learning:** Creating regex instances inside frequently called static methods like `checkWordBoundary` introduces significant overhead during document scanning.
 **Action:** Hoist frequently used regexes to static constants.
+
+## 2026-02-19 - [Trie Traversal & Match Retrieval Optimization]
+**Learning:** Reusing arrays and sets (hoisting them as class members) in the hot path of `pushChar` significantly reduces GC overhead. Switching `MatchNode.files` from `Set` to `Array` eliminates redundant `Array.from()` calls and allows single-pass filtering and alias detection.
+**Action:** Always look for buffer reuse opportunities in character-by-character processing loops. Minimize type conversions (Set -> Array) in hot paths.
