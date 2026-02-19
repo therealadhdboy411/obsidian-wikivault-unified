@@ -21,10 +21,12 @@ If your plugin does not need CSS, delete this file.
 }
 
 
-.virtual-link-span:hover .multiple-files-references {
+.virtual-link-span:hover .multiple-files-references,
+.virtual-link-span:focus-within .multiple-files-references {
     display: inline;
 }
-.virtual-link-span:hover .multiple-files-indicator {
+.virtual-link-span:hover .multiple-files-indicator,
+.virtual-link-span:focus-within .multiple-files-indicator {
     display: none;
 }
 

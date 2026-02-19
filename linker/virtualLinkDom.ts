@@ -49,6 +49,7 @@ export class VirtualMatch {
         link.setAttribute('from', this.from.toString());
         link.setAttribute('to', this.to.toString());
         link.setAttribute('origin-text', this.originText);
+        link.setAttribute('aria-label', `Link to ${linkText} (Auto-linked)`);
         link.classList.add('internal-link', 'virtual-link-a');
         return link;
     }
@@ -80,13 +81,18 @@ export class VirtualMatch {
             }
 
             let linkText = ` ${index + 1} `;
-            if (index < files!.length - 1) {
-                linkText += '|';
-            }
 
             let linkHref = file.path;
             const link = this.getLinkAnchorElement(linkText, linkHref);
+            link.setAttribute('aria-label', `Reference ${index + 1} to ${file.basename}`);
+            link.title = `Reference to: ${file.path}`;
             spanReferences.appendChild(link);
+
+            if (index < files!.length - 1) {
+                const separator = document.createElement('span');
+                separator.textContent = '|';
+                spanReferences.appendChild(separator);
+            }
 
             if (index == files!.length - 1) {
                 const bracket = document.createElement('span');
@@ -102,6 +108,7 @@ export class VirtualMatch {
         const spanIndicator = document.createElement('span');
         spanIndicator.textContent = ' [...]';
         spanIndicator.classList.add('multiple-files-indicator');
+        spanIndicator.setAttribute('aria-hidden', 'true');
         return spanIndicator;
     }
 
@@ -111,6 +118,7 @@ export class VirtualMatch {
             let icon = document.createElement('sup');
             icon.textContent = suffix;
             icon.classList.add('linker-suffix-icon');
+            icon.setAttribute('aria-hidden', 'true');
             return icon;
         }
         return null;
