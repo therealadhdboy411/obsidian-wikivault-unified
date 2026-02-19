@@ -17,3 +17,8 @@
 **Vulnerability:** User-controlled text from notes was interpolated directly into Markdown and Wikilink syntax when converting virtual links to real links. This allowed for link breakage or content injection if the text contained characters like `]`, `[[`, or `|`.
 **Learning:** Even internal tool transformations must treat document content as untrusted when using it to build structured syntax. Markdown parsers are particularly sensitive to unescaped brackets in link text and unquoted spaces or parentheses in URLs.
 **Prevention:** Always sanitize link text by escaping brackets for Markdown and removing link-breaking characters for Wikilinks. Wrap Markdown URLs in `<...>` if they contain special characters (spaces or parentheses) to ensure they are parsed as a single unit according to CommonMark.
+
+## 2026-06-15 - Exposure of Sensitive API Keys in Settings UI
+**Vulnerability:** API keys (OpenAI and LM Studio) were displayed in plain text within the plugin's settings tab. This created a risk of credential exposure through shoulder surfing, accidental screen sharing, or screenshots.
+**Learning:** Even though settings are stored locally, the UI is a vector for accidental exposure. Secret fields should never be visible by default in the interface.
+**Prevention:** For any sensitive information like API keys or tokens, use `inputEl.type = 'password'` on the text component in the settings tab. This leverages the browser's native credential masking.
