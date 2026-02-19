@@ -17,3 +17,11 @@
 **Vulnerability:** User-controlled text from notes was interpolated directly into Markdown and Wikilink syntax when converting virtual links to real links. This allowed for link breakage or content injection if the text contained characters like `]`, `[[`, or `|`.
 **Learning:** Even internal tool transformations must treat document content as untrusted when using it to build structured syntax. Markdown parsers are particularly sensitive to unescaped brackets in link text and unquoted spaces or parentheses in URLs.
 **Prevention:** Always sanitize link text by escaping brackets for Markdown and removing link-breaking characters for Wikilinks. Wrap Markdown URLs in `<...>` if they contain special characters (spaces or parentheses) to ensure they are parsed as a single unit according to CommonMark.
+
+## 2025-05-16 - [Manual Work Protection]
+**Learning:** Automatically modifying files based on link text alone can overwrite user-created notes if they happen to share a name with an unresolved link.
+**Action:** Added a mandatory frontmatter check (`generated: true`) in `processWikiLink` to skip any note not explicitly marked as plugin-managed.
+
+## 2025-05-16 - [Safe Regex Evaluation]
+**Learning:** Allowing users to provide custom regex patterns for filtering can lead to plugin crashes if the patterns are malformed.
+**Action:** Wrapped regex instantiation and evaluation in `try-catch` blocks within `shouldExcludeLink`.
