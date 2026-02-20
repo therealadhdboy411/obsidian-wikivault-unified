@@ -20,8 +20,13 @@ export class VirtualMatch {
 
     getCompleteLinkElement() {
         const span = this.getLinkRootSpan();
-        const firstPath = this.files.length > 0 ? this.files[0].path: ""; 
-        span.appendChild(this.getLinkAnchorElement(this.originText, firstPath));
+        const firstFile = this.files.length > 0 ? this.files[0] : null;
+        const firstPath = firstFile ? firstFile.path : "";
+        const mainLink = this.getLinkAnchorElement(this.originText, firstPath);
+        if (firstFile) {
+            mainLink.setAttribute('aria-label', `Virtual link to ${firstFile.basename}`);
+        }
+        span.appendChild(mainLink);
         if (this.files.length > 1) {
             if (!this.isSubWord) {
                 span.appendChild(this.getMultipleReferencesIndicatorSpan());
@@ -70,27 +75,31 @@ export class VirtualMatch {
 
         files = files ?? this.files;
 
-
-
         files.forEach((file, index) => {
             if (index === 0) {
                 const bracket = document.createElement('span');
                 bracket.textContent = this.isSubWord ? '[' : ' [';
+                bracket.setAttribute('aria-hidden', 'true');
                 spanReferences.appendChild(bracket);
             }
 
-            let linkText = ` ${index + 1} `;
-            if (index < files!.length - 1) {
-                linkText += '|';
-            }
-
-            let linkHref = file.path;
+            const linkText = ` ${index + 1} `;
+            const linkHref = file.path;
             const link = this.getLinkAnchorElement(linkText, linkHref);
+            link.setAttribute('aria-label', `Reference ${index + 1}: ${file.basename}`);
             spanReferences.appendChild(link);
+
+            if (index < files!.length - 1) {
+                const separator = document.createElement('span');
+                separator.textContent = '|';
+                separator.setAttribute('aria-hidden', 'true');
+                spanReferences.appendChild(separator);
+            }
 
             if (index == files!.length - 1) {
                 const bracket = document.createElement('span');
                 bracket.textContent = ']';
+                bracket.setAttribute('aria-hidden', 'true');
                 spanReferences.appendChild(bracket);
             }
         });
@@ -102,13 +111,15 @@ export class VirtualMatch {
         const spanIndicator = document.createElement('span');
         spanIndicator.textContent = ' [...]';
         spanIndicator.classList.add('multiple-files-indicator');
+        spanIndicator.setAttribute('aria-label', 'Multiple references available');
+        spanIndicator.setAttribute('title', 'Multiple references available');
         return spanIndicator;
     }
 
     getIconSpan() {
         const suffix = this.isAlias ? this.settings.virtualLinkAliasSuffix : this.settings.virtualLinkSuffix;
         if ((suffix?.length ?? 0) > 0) {
-            let icon = document.createElement('sup');
+            const icon = document.createElement('sup');
             icon.textContent = suffix;
             icon.classList.add('linker-suffix-icon');
             return icon;
@@ -144,7 +155,7 @@ export class VirtualMatch {
         });
     }
 
-    static filterOverlapping(matches: VirtualMatch[], onlyLinkOnce: boolean = true, excludedIntervalTree?: IntervalTree): VirtualMatch[] {
+    static filterOverlapping(matches: VirtualMatch[], onlyLinkOnce = true, excludedIntervalTree?: IntervalTree): VirtualMatch[] {
         const matchesToDelete: Map<number, boolean> = new Map();
 
         // Delete additions that overlap
