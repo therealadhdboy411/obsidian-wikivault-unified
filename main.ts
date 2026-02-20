@@ -981,8 +981,11 @@ class LinkerSettingTab extends PluginSettingTab {
         containerEl.empty();
 
         // Toggle to activate or deactivate the linker
-        new Setting(containerEl).setName('Activate Virtual Linker').addToggle((toggle) =>
-            toggle.setValue(this.plugin.settings.linkerActivated).onChange(async (value) => {
+        new Setting(containerEl)
+            .setName('Activate Virtual Linker')
+            .setDesc('Enables or disables the dynamic rendering of virtual links in your notes.')
+            .addToggle((toggle) =>
+                toggle.setValue(this.plugin.settings.linkerActivated).onChange(async (value) => {
                 // console.log("Linker activated: " + value);
                 await this.plugin.updateSettings({ linkerActivated: value });
             })
