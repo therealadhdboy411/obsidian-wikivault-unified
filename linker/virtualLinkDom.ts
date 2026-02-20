@@ -44,6 +44,8 @@ export class VirtualMatch {
         }
         link.href = href;
         link.textContent = linkText;
+        link.setAttribute('aria-label', linkText);
+        link.title = href;
         link.target = '_blank';
         link.rel = 'noopener noreferrer';
         link.setAttribute('from', this.from.toString());
@@ -76,21 +78,28 @@ export class VirtualMatch {
             if (index === 0) {
                 const bracket = document.createElement('span');
                 bracket.textContent = this.isSubWord ? '[' : ' [';
+                bracket.setAttribute('aria-hidden', 'true');
                 spanReferences.appendChild(bracket);
             }
 
-            let linkText = ` ${index + 1} `;
-            if (index < files!.length - 1) {
-                linkText += '|';
-            }
-
-            let linkHref = file.path;
+            const linkText = `${index + 1}`;
+            const linkHref = file.path;
             const link = this.getLinkAnchorElement(linkText, linkHref);
+            link.setAttribute('aria-label', `Match ${index + 1}: ${file.basename}`);
+            link.title = file.path;
             spanReferences.appendChild(link);
+
+            if (index < files!.length - 1) {
+                const separator = document.createElement('span');
+                separator.textContent = '|';
+                separator.setAttribute('aria-hidden', 'true');
+                spanReferences.appendChild(separator);
+            }
 
             if (index == files!.length - 1) {
                 const bracket = document.createElement('span');
                 bracket.textContent = ']';
+                bracket.setAttribute('aria-hidden', 'true');
                 spanReferences.appendChild(bracket);
             }
         });
@@ -102,6 +111,7 @@ export class VirtualMatch {
         const spanIndicator = document.createElement('span');
         spanIndicator.textContent = ' [...]';
         spanIndicator.classList.add('multiple-files-indicator');
+        spanIndicator.setAttribute('aria-hidden', 'true');
         return spanIndicator;
     }
 
@@ -111,6 +121,7 @@ export class VirtualMatch {
             let icon = document.createElement('sup');
             icon.textContent = suffix;
             icon.classList.add('linker-suffix-icon');
+            icon.setAttribute('aria-hidden', 'true');
             return icon;
         }
         return null;
