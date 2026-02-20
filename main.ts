@@ -767,6 +767,8 @@ export default class LinkerPlugin extends Plugin {
     }
 
     async processWikiLink(linkName: string) {
+        // Sanitize linkName to prevent path traversal
+        linkName = linkName.replace(/\.\./g, '');
         const baseFileName = `${linkName}.md`;
         const fullPath = this.settings.useCustomDirectory ? `${this.settings.customDirectoryName}/${baseFileName}` : baseFileName;
         const existingFile = this.app.vault.getAbstractFileByPath(fullPath);
@@ -930,7 +932,7 @@ export default class LinkerPlugin extends Plugin {
         const prompt = this.settings.customPrompt.replace(/{term}/g, linkName);
 
         const response = await requestUrl({
-            url: `${this.settings.openaiEndpoint}/chat/completions`,
+            url: `${this.settings.openaiEndpoint.replace(/\/+$/, '')}/chat/completions`,
             method: 'POST',
             headers: {
                 Authorization: `Bearer ${this.settings.openaiApiKey}`,
@@ -955,7 +957,7 @@ export default class LinkerPlugin extends Plugin {
         }
 
         const response = await requestUrl({
-            url: `${this.settings.lmstudioEndpoint}/api/v1/chat`,
+            url: `${this.settings.lmstudioEndpoint.replace(/\/+$/, '')}/api/v1/chat`,
             method: 'POST',
             headers,
             body: JSON.stringify({
@@ -1480,11 +1482,12 @@ class LinkerSettingTab extends PluginSettingTab {
             new Setting(containerEl)
                 .setName('OpenAI API key')
                 .setDesc('API key used for OpenAI-compatible providers.')
-                .addText((text) =>
+                .addText((text) => {
+                    text.inputEl.type = 'password';
                     text.setValue(this.plugin.settings.openaiApiKey).onChange(async (value) => {
                         await this.plugin.updateSettings({ openaiApiKey: value });
-                    })
-                );
+                    });
+                });
         } else {
             new Setting(containerEl)
                 .setName('LM Studio endpoint')
@@ -1498,11 +1501,12 @@ class LinkerSettingTab extends PluginSettingTab {
             new Setting(containerEl)
                 .setName('LM Studio API key (optional)')
                 .setDesc('Leave empty unless authentication is enabled in LM Studio.')
-                .addText((text) =>
+                .addText((text) => {
+                    text.inputEl.type = 'password';
                     text.setValue(this.plugin.settings.lmstudioApiKey).onChange(async (value) => {
                         await this.plugin.updateSettings({ lmstudioApiKey: value });
-                    })
-                );
+                    });
+                });
         }
 
         new Setting(containerEl)
@@ -1540,7 +1544,8 @@ class LinkerSettingTab extends PluginSettingTab {
                 .setDesc('Folder where generated notes are created/updated.')
                 .addText((text) =>
                     text.setValue(this.plugin.settings.customDirectoryName).onChange(async (value) => {
-                        await this.plugin.updateSettings({ customDirectoryName: value });
+                        const sanitized = value.replace(/\.\./g, '');
+                        await this.plugin.updateSettings({ customDirectoryName: sanitized });
                     })
                 );
         }

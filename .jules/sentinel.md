@@ -17,3 +17,8 @@
 **Vulnerability:** User-controlled text from notes was interpolated directly into Markdown and Wikilink syntax when converting virtual links to real links. This allowed for link breakage or content injection if the text contained characters like `]`, `[[`, or `|`.
 **Learning:** Even internal tool transformations must treat document content as untrusted when using it to build structured syntax. Markdown parsers are particularly sensitive to unescaped brackets in link text and unquoted spaces or parentheses in URLs.
 **Prevention:** Always sanitize link text by escaping brackets for Markdown and removing link-breaking characters for Wikilinks. Wrap Markdown URLs in `<...>` if they contain special characters (spaces or parentheses) to ensure they are parsed as a single unit according to CommonMark.
+
+## 2026-06-15 - UX Regressions from Aggressive Path Sanitization
+**Vulnerability:** Path traversal via `..` sequences in user-provided directory names and link titles.
+**Learning:** Implementing destructive sanitization (e.g., removing all slashes or trailing slashes) in `onChange` handlers for settings can break core functionality like subfolder support and interfere with natural typing.
+**Prevention:** Use non-destructive sanitization for `onChange` (e.g., only removing `..`) and perform more aggressive cleanup (like trailing slash removal) at the usage site or during a final "blur" event.
