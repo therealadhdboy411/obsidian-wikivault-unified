@@ -69,3 +69,89 @@ Aside from the original **Virtual Linker** rendering engine, the core logic, fea
 ---
 
 *AI can make mistakes, always check information.*
+
+## Roadmap & Upcoming Features
+
+### 🎯 Smart Processing & Control
+- [ ] **Selective Processing**
+  - [x] Process only unresolved links from the current file (not entire vault)
+  - [x] Exclude patterns (e.g., skip dates, URLs, or specific prefixes like "MOC-")
+  - [ ] Preview mode - show what will be created before generating
+  - [ ] Dry run - report what would be processed without creating files
+- [ ] **Update Management**
+  - [x] Incremental updates - only add new mentions, preserve existing content
+  - [x] Track last update timestamp in frontmatter
+  - [x] "Preserve user edits" section that won't be overwritten
+  - [ ] Skip regeneration if note was manually edited
+  - [ ] Update only AI summary vs entire note
+
+### 📝 Customization & Templates
+- [ ] **Template System**
+  - [x] Custom note templates with variables like {{title}}, {{summary}}, {{mentions}}
+  - [ ] Different templates for different link types (people, concepts, places)
+  - [ ] Template per folder or tag pattern
+  - [ ] YAML frontmatter customization (auto-add tags, dates, status)
+- [ ] **Custom AI Prompts**
+  - [ ] Editable system prompt for summaries
+  - [ ] Different prompts for different contexts (technical terms vs people vs places)
+  - [ ] Multi-step prompts (summary → detailed explanation → examples)
+  - [ ] Prompt templates with variables
+
+### 🔍 Enhanced Context & Content
+- [ ] **Better Context Extraction**
+  - [x] Include full paragraphs, not just lines
+  - [x] Capture heading hierarchy (show which section the mention is in)
+  - [ ] Extract surrounding context (±2 sentences)
+  - [ ] Show block references if the mention is in a block
+- [ ] **Content Enrichment**
+  - [ ] Auto-generate tags based on AI analysis
+  - [ ] Suggest related wikilinks based on content
+  - [ ] Extract key quotes from mentions
+  - [ ] Generate a "Related Concepts" section
+
+### 🤖 Advanced AI Features
+- [ ] **Multi-Model Support**
+  - [ ] Query multiple models simultaneously and compare results
+  - [ ] Fallback chain (try LM Studio → Mistral → OpenAI)
+  - [ ] A/B testing mode to compare model outputs
+  - [ ] Consensus summary from multiple models
+- [ ] **Smarter Summaries**
+  - [ ] Detect entity type (person/place/concept) and adjust prompt
+  - [ ] Include confidence score or uncertainty indicators
+  - [ ] Add source citations for factual claims
+  - [ ] Generate multiple summary lengths (short/medium/long)
+
+### 📊 Analytics & Visualization
+- [ ] **Statistics & Reporting**
+  - [ ] Dashboard showing # of generated notes, most-mentioned terms
+  - [ ] Link relationship graph
+  - [ ] Track which AI model was used for each note
+  - [ ] Processing history log
+- [ ] **Quality Indicators**
+  - [ ] Fuzzy match confidence score displayed in notes
+  - [ ] Flag potentially incorrect AI summaries for review
+  - [ ] Show how many mentions exist for each term
+
+### ⚡ Performance & UX
+- [ ] **Batch Processing Improvements**
+  - [ ] Parallel AI requests (process multiple links simultaneously)
+  - [ ] Queue system with priority (process frequently mentioned terms first)
+  - [ ] Resume interrupted processing
+  - [ ] Rate limiting configuration for API calls
+- [ ] **User Interface**
+  - [x] Command to process single link under cursor
+  - [ ] Right-click context menu on unresolved links
+  - [ ] Status bar showing current processing status
+  - [ ] Progress bar with ETA
+
+### 🔧 Power User Features
+- [ ] **Advanced Matching**
+  - [ ] Synonym detection (link "ML" → note about "Machine Learning")
+  - [ ] Abbreviation expansion
+  - [ ] Handle plurals/variations automatically
+  - [ ] Cross-reference with external knowledge base
+- [ ] **Integration**
+  - [ ] Export generated notes to Anki
+  - [ ] Sync definitions with a glossary note
+  - [ ] Integration with Dataview for queries
+  - [ ] Webhook notifications when processing completes
