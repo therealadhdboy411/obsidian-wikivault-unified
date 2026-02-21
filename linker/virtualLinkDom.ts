@@ -181,7 +181,7 @@ export class VirtualMatch {
                         continue;
                     }
 
-                    if (otherAddition.files.every((f) => addition.files.contains(f))) {
+                    if (otherAddition.files.every((f) => addition.files.includes(f))) {
                         matchesToDelete.set(otherAddition.id, true);
                     }
                 }
