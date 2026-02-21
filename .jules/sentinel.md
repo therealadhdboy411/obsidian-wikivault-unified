@@ -17,3 +17,8 @@
 **Vulnerability:** User-controlled text from notes was interpolated directly into Markdown and Wikilink syntax when converting virtual links to real links. This allowed for link breakage or content injection if the text contained characters like `]`, `[[`, or `|`.
 **Learning:** Even internal tool transformations must treat document content as untrusted when using it to build structured syntax. Markdown parsers are particularly sensitive to unescaped brackets in link text and unquoted spaces or parentheses in URLs.
 **Prevention:** Always sanitize link text by escaping brackets for Markdown and removing link-breaking characters for Wikilinks. Wrap Markdown URLs in `<...>` if they contain special characters (spaces or parentheses) to ensure they are parsed as a single unit according to CommonMark.
+
+## 2026-06-12 - Path Traversal in Note Generation
+**Vulnerability:** User-defined custom directory names and automatically extracted link names were used to construct file paths without sanitization. An attacker or accidental malformed link like `[[../../secrets]]` could cause the plugin to write or modify files outside the intended vault directory.
+**Learning:** In Obsidian plugins, even though the `Vault` API provides some protection, constructing paths using string concatenation with untrusted input (like unresolved links) remains a risk. Path traversal sequences like `..` should be explicitly stripped.
+**Prevention:** Sanitize any user-controlled input used in file system paths by removing `..` and ensuring the resulting path is normalized and remains within the intended scope.
