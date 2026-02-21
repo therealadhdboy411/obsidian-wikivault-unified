@@ -1480,11 +1480,12 @@ class LinkerSettingTab extends PluginSettingTab {
             new Setting(containerEl)
                 .setName('OpenAI API key')
                 .setDesc('API key used for OpenAI-compatible providers.')
-                .addText((text) =>
+                .addText((text) => {
+                    text.inputEl.type = 'password';
                     text.setValue(this.plugin.settings.openaiApiKey).onChange(async (value) => {
                         await this.plugin.updateSettings({ openaiApiKey: value });
-                    })
-                );
+                    });
+                });
         } else {
             new Setting(containerEl)
                 .setName('LM Studio endpoint')
@@ -1498,11 +1499,12 @@ class LinkerSettingTab extends PluginSettingTab {
             new Setting(containerEl)
                 .setName('LM Studio API key (optional)')
                 .setDesc('Leave empty unless authentication is enabled in LM Studio.')
-                .addText((text) =>
+                .addText((text) => {
+                    text.inputEl.type = 'password';
                     text.setValue(this.plugin.settings.lmstudioApiKey).onChange(async (value) => {
                         await this.plugin.updateSettings({ lmstudioApiKey: value });
-                    })
-                );
+                    });
+                });
         }
 
         new Setting(containerEl)
