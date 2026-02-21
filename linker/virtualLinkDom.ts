@@ -50,6 +50,14 @@ export class VirtualMatch {
         link.setAttribute('to', this.to.toString());
         link.setAttribute('origin-text', this.originText);
         link.classList.add('internal-link', 'virtual-link-a');
+
+        const fileName = href.split('/').pop()?.replace('.md', '') || href;
+        if (linkText === this.originText) {
+            link.setAttribute('aria-label', `Virtual link to ${fileName}`);
+        } else {
+            const refIndex = linkText.trim().replace('|', '').trim();
+            link.setAttribute('aria-label', `Reference ${refIndex}: ${fileName}`);
+        }
         return link;
     }
 
@@ -76,12 +84,15 @@ export class VirtualMatch {
             if (index === 0) {
                 const bracket = document.createElement('span');
                 bracket.textContent = this.isSubWord ? '[' : ' [';
+                bracket.setAttribute('aria-hidden', 'true');
                 spanReferences.appendChild(bracket);
             }
 
             let linkText = ` ${index + 1} `;
+            let showPipe = false;
             if (index < files!.length - 1) {
                 linkText += '|';
+                showPipe = true;
             }
 
             let linkHref = file.path;
@@ -91,6 +102,7 @@ export class VirtualMatch {
             if (index == files!.length - 1) {
                 const bracket = document.createElement('span');
                 bracket.textContent = ']';
+                bracket.setAttribute('aria-hidden', 'true');
                 spanReferences.appendChild(bracket);
             }
         });
@@ -101,6 +113,7 @@ export class VirtualMatch {
     getMultipleReferencesIndicatorSpan() {
         const spanIndicator = document.createElement('span');
         spanIndicator.textContent = ' [...]';
+        spanIndicator.setAttribute('aria-hidden', 'true');
         spanIndicator.classList.add('multiple-files-indicator');
         return spanIndicator;
     }
