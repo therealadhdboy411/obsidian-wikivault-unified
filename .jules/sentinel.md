@@ -17,3 +17,8 @@
 **Vulnerability:** User-controlled text from notes was interpolated directly into Markdown and Wikilink syntax when converting virtual links to real links. This allowed for link breakage or content injection if the text contained characters like `]`, `[[`, or `|`.
 **Learning:** Even internal tool transformations must treat document content as untrusted when using it to build structured syntax. Markdown parsers are particularly sensitive to unescaped brackets in link text and unquoted spaces or parentheses in URLs.
 **Prevention:** Always sanitize link text by escaping brackets for Markdown and removing link-breaking characters for Wikilinks. Wrap Markdown URLs in `<...>` if they contain special characters (spaces or parentheses) to ensure they are parsed as a single unit according to CommonMark.
+
+## 2026-05-23 - Path Traversal and Credential Exposure
+**Vulnerability:** Unsanitized user input (linkName and customDirectoryName) was used to construct file paths in wiki generation, potentially allowing files to be created outside the intended directories via ".." sequences. Additionally, API keys for OpenAI and LM Studio were displayed in plaintext in the settings UI.
+**Learning:** Path construction from external or user-provided strings must always be sanitized, even if the underlying API (like Obsidian's vault) has some built-in protections. Credential visibility in the UI is a privacy risk that should be mitigated with appropriate input types.
+**Prevention:** Sanitize all path components by removing ".." and other traversal sequences before use. Use the "password" input type for all sensitive configuration settings to prevent accidental exposure.
