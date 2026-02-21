@@ -5,3 +5,7 @@
 ## 2025-05-15 - [Regex Overhead]
 **Learning:** Creating regex instances inside frequently called static methods like `checkWordBoundary` introduces significant overhead during document scanning.
 **Action:** Hoist frequently used regexes to static constants.
+
+## 2025-05-16 - [Buffer Reuse and Type Optimization]
+**Learning:** Frequent allocations of arrays and Sets in the prefix tree scanning path (`pushChar` and `getCurrentMatchNodes`) cause significant GC pressure. Converting `MatchNode.files` to a plain array and caching `PrefixNode` file sets as arrays avoids repeated $O(N)$ conversions.
+**Action:** Use double-buffering for active nodes and cache Set-to-Array conversions in the trie nodes.
