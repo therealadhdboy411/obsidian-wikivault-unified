@@ -58,6 +58,8 @@ export interface LinkerPluginSettings {
     useDictionaryAPI: boolean;
     dictionaryAPIEndpoint: string;
     maxMentionsPerTerm: number;
+    noteTemplate: string;
+    excludePatterns: string;
     // wordBoundaryRegex: string;
     // conversionFormat
 }
@@ -113,6 +115,8 @@ const DEFAULT_SETTINGS: LinkerPluginSettings = {
     useDictionaryAPI: true,
     dictionaryAPIEndpoint: 'https://api.dictionaryapi.dev/api/v2/entries/en/',
     maxMentionsPerTerm: 25,
+    noteTemplate: `---\ngenerated: {{generated}}\nlast_updated: {{last_updated}}\nmodel: {{model}}\n---\n\n# {{title}}\n\n> {{summary}}\n\n## User Edits\n\n{{user_edits}}\n\n{{fuzzy_match}}\n\n## Mentions\n\n{{mentions}}\n\n## Dictionary Definition\n\n{{dictionary}}`,
+    excludePatterns: '',
     // wordBoundaryRegex: '/[\t- !-/:-@\[-`{-~\p{Emoji_Presentation}\p{Extended_Pictographic}]/u',
 };
 
@@ -300,8 +304,20 @@ export default class LinkerPlugin extends Plugin {
 
         this.addCommand({
             id: 'generate-missing-notes',
-            name: 'Generate missing Wikilink notes',
+            name: 'Generate missing Wikilink notes (Entire Vault)',
             callback: () => this.generateMissingNotes(),
+        });
+
+        this.addCommand({
+            id: 'process-current-file',
+            name: 'Process unresolved links in current file',
+            callback: () => this.processCurrentFile(),
+        });
+
+        this.addCommand({
+            id: 'process-link-under-cursor',
+            name: 'Process unresolved link under cursor',
+            callback: () => this.processLinkUnderCursor(),
         });
 
         if (this.settings.runOnStartup) {
@@ -736,33 +752,120 @@ export default class LinkerPlugin extends Plugin {
             return;
         }
 
+        await this.processLinkList(Array.from(linksToProcess), 'Vault');
+    }
+
+    async processCurrentFile() {
+        const activeFile = this.app.workspace.getActiveFile();
+        if (!activeFile) {
+            new Notice('WikiVault: No active file.');
+            return;
+        }
+
+        const unresolvedLinks = this.app.metadataCache.unresolvedLinks[activeFile.path];
+        if (!unresolvedLinks || Object.keys(unresolvedLinks).length === 0) {
+            new Notice('WikiVault: No unresolved links found in current file.');
+            return;
+        }
+
+        await this.processLinkList(Object.keys(unresolvedLinks), 'Current File');
+    }
+
+    async processLinkUnderCursor() {
+        const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (!view) return;
+
+        const editor = view.editor;
+        const cursor = editor.getCursor();
+        const line = editor.getLine(cursor.line);
+
+        // Find wikilink under cursor: [[Link]]
+        const wikilinkRegex = /\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g;
+        let match;
+        let linkName = null;
+
+        while ((match = wikilinkRegex.exec(line)) !== null) {
+            const start = match.index;
+            const end = match.index + match[0].length;
+            if (cursor.ch >= start && cursor.ch <= end) {
+                linkName = match[1];
+                break;
+            }
+        }
+
+        if (!linkName) {
+            new Notice('WikiVault: No wikilink found under cursor.');
+            return;
+        }
+
+        const activeFile = this.app.workspace.getActiveFile();
+        if (!activeFile) return;
+
+        const dest = this.app.metadataCache.getFirstLinkpathDest(linkName, activeFile.path);
+        if (dest) {
+            new Notice(`WikiVault: Link "[[${linkName}]]" is already resolved.`);
+            return;
+        }
+
+        if (this.settings.excludePatterns) {
+            try {
+                const excludeRegex = new RegExp(this.settings.excludePatterns, 'i');
+                if (excludeRegex.test(linkName)) {
+                    new Notice(`WikiVault: Link "[[${linkName}]]" is excluded by pattern.`);
+                    return;
+                }
+            } catch (e) {
+                console.error('WikiVault: Invalid exclude pattern', e);
+            }
+        }
+
+        new Notice(`WikiVault: Processing "[[${linkName}]]"...`);
+        await this.processWikiLink(linkName);
+        new Notice(`WikiVault: Finished processing "[[${linkName}]]".`);
+    }
+
+    async processLinkList(links: string[], scope: string) {
         if (this.settings.useCustomDirectory) {
             await this.ensureDirectoryExists(this.settings.customDirectoryName);
         }
 
-        const total = linksToProcess.size;
+        const total = links.length;
         let current = 0;
         let notice: Notice | null = null;
 
         if (this.settings.showProgressNotification) {
-            notice = new Notice(`WikiVault: Processing 0/${total} links...`, 0);
+            notice = new Notice(`WikiVault: Processing 0/${total} links from ${scope}...`, 0);
         }
 
-        for (const linkName of linksToProcess) {
+        let excludeRegex: RegExp | null = null;
+        if (this.settings.excludePatterns) {
+            try {
+                excludeRegex = new RegExp(this.settings.excludePatterns, 'i');
+            } catch (e) {
+                console.error('WikiVault: Invalid exclude pattern', e);
+            }
+        }
+
+        for (const linkName of links) {
+            if (excludeRegex && excludeRegex.test(linkName)) {
+                current++;
+                continue;
+            }
+
             await this.processWikiLink(linkName);
             current++;
 
             const progressText = `WikiVault: ${current}/${total} links`;
             this.statusBarItemEl.setText(progressText);
             if (notice) {
-                notice.setMessage(`WikiVault: Processing ${current}/${total} links...`);
+                notice.setMessage(`WikiVault: Processing ${current}/${total} links from ${scope}...`);
             }
         }
 
         setTimeout(() => {
             this.statusBarItemEl.setText('');
             if (notice) notice.hide();
-            new Notice(`WikiVault: Completed processing ${total} links.`);
+            new Notice(`WikiVault: Completed processing ${total} links from ${scope}.`);
         }, 2000);
     }
 
@@ -771,29 +874,68 @@ export default class LinkerPlugin extends Plugin {
         const fullPath = this.settings.useCustomDirectory ? `${this.settings.customDirectoryName}/${baseFileName}` : baseFileName;
         const existingFile = this.app.vault.getAbstractFileByPath(fullPath);
 
-        let content = '';
+        let oldContent = '';
+        let userEdits = '';
+        let oldMentions = new Set<string>();
+        let generatedDate = new Date().toISOString();
 
-        const fuzzyMatch = this.findFuzzyMatch(linkName);
-        if (fuzzyMatch && fuzzyMatch.basename.toLowerCase() !== linkName.toLowerCase()) {
-            content += `See [[${fuzzyMatch.basename}]]\n\n`;
-        }
+        if (existingFile instanceof TFile) {
+            oldContent = await this.app.vault.read(existingFile);
+            const cache = this.app.metadataCache.getFileCache(existingFile);
 
-        const context = await this.extractContext(linkName);
-        content += `## Mentions\n\n${context}\n\n`;
+            // Skip if manually edited (no 'generated' field)
+            if (cache?.frontmatter && !cache.frontmatter.generated) {
+                console.log(`WikiVault: Skipping ${linkName} - manual edit detected`);
+                return;
+            }
 
-        if (this.settings.useDictionaryAPI) {
-            const dictionaryDefinition = await this.getDictionaryDefinition(linkName);
-            if (dictionaryDefinition) {
-                content += `## Dictionary Definition\n\n${dictionaryDefinition}\n\n`;
+            if (cache?.frontmatter?.generated) {
+                generatedDate = cache.frontmatter.generated;
+            }
+
+            // Extract User Edits
+            const userEditsMatch = oldContent.match(/## User Edits\n\n([\s\S]*?)(?:\n\n##|$)/);
+            if (userEditsMatch) {
+                userEdits = userEditsMatch[1].trim();
+            }
+
+            // Extract existing mentions
+            const mentionsMatch = oldContent.match(/## Mentions\n\n([\s\S]*?)(?:\n\n##|$)/);
+            if (mentionsMatch) {
+                const mentions = mentionsMatch[1].split('\n\n');
+                for (const m of mentions) {
+                    const trimmed = m.trim();
+                    if (trimmed && !trimmed.startsWith('*No mentions found')) {
+                        oldMentions.add(trimmed);
+                    }
+                }
             }
         }
 
-        const summary = await this.getAISummary(linkName);
-        if (summary) {
-            content = `# ${linkName}\n\n> ${summary}\n\n` + content;
-        } else {
-            content = `# ${linkName}\n\n` + content;
+        const newMentionsContext = await this.extractContext(linkName);
+        const betterMentions = newMentionsContext.split('\n\n').filter(m => m.trim() && !m.includes('*No mentions found'));
+        for (const m of betterMentions) {
+            oldMentions.add(m.trim());
         }
+
+        const summary = (await this.getAISummary(linkName)) || '';
+        const dictionary = this.settings.useDictionaryAPI ? (await this.getDictionaryDefinition(linkName) || '') : '';
+        const fuzzy = this.findFuzzyMatch(linkName);
+        const fuzzyLink = (fuzzy && fuzzy.basename.toLowerCase() !== linkName.toLowerCase()) ? `### See Also\n\n[[${fuzzy.basename}]]` : '';
+
+        const now = new Date().toISOString();
+        const mentionsList = Array.from(oldMentions).slice(0, this.settings.maxMentionsPerTerm).join('\n\n');
+
+        const content = this.settings.noteTemplate
+            .replace(/{{title}}/g, linkName)
+            .replace(/{{summary}}/g, summary)
+            .replace(/{{mentions}}/g, mentionsList)
+            .replace(/{{dictionary}}/g, dictionary)
+            .replace(/{{user_edits}}/g, userEdits || '<!-- Add your own notes here, they will be preserved -->')
+            .replace(/{{fuzzy_match}}/g, fuzzyLink)
+            .replace(/{{generated}}/g, generatedDate)
+            .replace(/{{last_updated}}/g, now)
+            .replace(/{{model}}/g, this.settings.modelName);
 
         if (existingFile instanceof TFile) {
             await this.app.vault.modify(existingFile, content);
@@ -1618,5 +1760,25 @@ class LinkerSettingTab extends PluginSettingTab {
                         await this.plugin.updateSettings({ maxMentionsPerTerm: value });
                     })
             );
+
+        new Setting(containerEl)
+            .setName('Note template')
+            .setDesc('Custom template for generated notes. Placeholders: {{title}}, {{summary}}, {{mentions}}, {{dictionary}}, {{user_edits}}, {{fuzzy_match}}, {{generated}}, {{last_updated}}, {{model}}')
+            .addTextArea((text) => {
+                text.setValue(this.plugin.settings.noteTemplate).onChange(async (value) => {
+                    await this.plugin.updateSettings({ noteTemplate: value });
+                });
+                text.inputEl.addClass('linker-settings-text-box-large');
+            });
+
+        new Setting(containerEl)
+            .setName('Exclude patterns')
+            .setDesc('Regex patterns to exclude certain terms from wiki generation (e.g. ^MOC-, ^\\d{4}-\\d{2}-\\d{2}$). One pattern per line or use | for OR.')
+            .addTextArea((text) => {
+                text.setValue(this.plugin.settings.excludePatterns).onChange(async (value) => {
+                    await this.plugin.updateSettings({ excludePatterns: value });
+                });
+                text.inputEl.addClass('linker-settings-text-box');
+            });
     }
 }
