@@ -66,6 +66,8 @@ export class PrefixTree {
     fetcher: LinkerMetaInfoFetcher;
 
     _currentNodes: VisitedPrefixNode[] = [];
+    _nextNodes: VisitedPrefixNode[] = [];
+    _seenNodes: Set<PrefixNode> = new Set();
 
     setIndexedFilePaths: Set<string> = new Set();
     mapIndexedFilePathsToUpdateTime: Map<string, number> = new Map();
@@ -85,37 +87,64 @@ export class PrefixTree {
     }
 
     getCurrentMatchNodes(index: number, excludedNote?: TFile | null): MatchNode[] {
+        if (this._currentNodes.length === 0) {
+            return [];
+        }
+
         const matchNodes: MatchNode[] = [];
 
         if (excludedNote === undefined && this.settings.excludeLinksToOwnNote) {
             excludedNote = this.app.workspace.getActiveFile();
         }
+        const excludedPath = excludedNote?.path;
 
         // From the current nodes in the trie, get all nodes that have files
         for (const node of this._currentNodes) {
-            if (node.node.files.size === 0) {
+            const prefixNode = node.node;
+            if (prefixNode.files.size === 0) {
                 continue;
             }
+
+            // Optimization: avoid filtering and new Set creation if excluded note is not present
+            let files: Set<TFile> = prefixNode.files;
+            if (excludedPath) {
+                let hasExcluded = false;
+                for (const file of files) {
+                    if (file.path === excludedPath) {
+                        hasExcluded = true;
+                        break;
+                    }
+                }
+
+                if (hasExcluded) {
+                    if (files.size === 1) {
+                        continue;
+                    }
+                    files = new Set(Array.from(files).filter((file) => file.path !== excludedPath));
+                }
+            }
+
+            if (files.size === 0) {
+                continue;
+            }
+
+            if (prefixNode.requiresCaseMatch && !node.caseIsMatched) {
+                continue;
+            }
+
             const matchNode = new MatchNode();
-            matchNode.length = node.node.value.length + node.formattingDelta;
+            matchNode.length = prefixNode.value.length + node.formattingDelta;
             matchNode.start = index - matchNode.length;
+            matchNode.files = files;
+            matchNode.value = prefixNode.value;
+            matchNode.requiresCaseMatch = prefixNode.requiresCaseMatch;
+            matchNode.caseIsMatched = node.caseIsMatched;
+            matchNode.startsAtWordBoundary = node.startedAtWordBeginning;
 
-            if (excludedNote) {
-                matchNode.files = new Set(Array.from(node.node.files).filter((file) => file.path !== excludedNote!.path));
-            } else {
-                matchNode.files = node.node.files;
-            }
-
-            if (matchNode.files.size === 0) {
-                continue;
-            }
-
-            matchNode.value = node.node.value;
-            matchNode.requiresCaseMatch = node.node.requiresCaseMatch;
-
-            const nodeValueLower = node.node.value.toLowerCase();
+            // Inline isAlias check
+            const nodeValueLower = matchNode.value.toLowerCase();
             let isAlias = true;
-            for (const file of matchNode.files) {
+            for (const file of files) {
                 if (file.basename.toLowerCase() === nodeValueLower) {
                     isAlias = false;
                     break;
@@ -123,21 +152,13 @@ export class PrefixTree {
             }
             matchNode.isAlias = isAlias;
 
-            // Check if the case is matched
-            matchNode.caseIsMatched = node.caseIsMatched;
-
-            // Check if the match starts at a word boundary
-            matchNode.startsAtWordBoundary = node.startedAtWordBeginning;
-
-            if (matchNode.requiresCaseMatch && !matchNode.caseIsMatched) {
-                continue;
-            }
-
             matchNodes.push(matchNode);
         }
 
-        // Sort nodes by length
-        matchNodes.sort((a, b) => b.length - a.length);
+        // Sort nodes by length, skip if 0 or 1 matches
+        if (matchNodes.length > 1) {
+            matchNodes.sort((a, b) => b.length - a.length);
+        }
 
         return matchNodes;
     }
@@ -413,45 +434,49 @@ export class PrefixTree {
         this._currentNodes = [new VisitedPrefixNode(this.root)];
     }
 
-    pushChar(char: string) {
-        const newNodes: VisitedPrefixNode[] = [];
-        const seenNodes = new Set<PrefixNode>();
-        const charLower = char.toLowerCase();
-        const chars = char === charLower ? [char] : [char, charLower];
-
-        for (const c of chars) {
-            const isBoundary = PrefixTree.checkWordBoundary(c);
-            if (this.settings.matchAnyPartsOfWords || isBoundary || this.settings.matchEndOfWords) {
-                if (!seenNodes.has(this.root)) {
-                    newNodes.push(new VisitedPrefixNode(this.root, true, isBoundary));
-                    seenNodes.add(this.root);
-                }
-            }
-
-            for (const node of this._currentNodes) {
-                const child = node.node.children.get(c);
-                const startedAtBoundary = node.startedAtWordBeginning;
-                if (child && !seenNodes.has(child)) {
-                    const newVisited = new VisitedPrefixNode(child, node.caseIsMatched && char === c, startedAtBoundary);
-                    newVisited.formattingDelta = node.formattingDelta;
-                    newNodes.push(newVisited);
-                    seenNodes.add(child);
-                }
-            }
-
-            // TODO: Ignore formatting (#59)
-            if (false) {
-                // Check if the current char is a formatting char, if so also add the current nodes
-                const isFormatting = PrefixTree.isFormattingChar(char);
-                if (isFormatting) {
-                    this._currentNodes.forEach((node) => {
-                        node.formattingDelta += 1;
-                    });
-                    newNodes.push(...this._currentNodes);
-                }
+    private _pushToNextNodes(c: string, char: string, exactMatch: boolean, isBoundary: boolean) {
+        if (this.settings.matchAnyPartsOfWords || isBoundary || this.settings.matchEndOfWords) {
+            if (!this._seenNodes.has(this.root)) {
+                this._nextNodes.push(new VisitedPrefixNode(this.root, true, isBoundary));
+                this._seenNodes.add(this.root);
             }
         }
-        this._currentNodes = newNodes;
+
+        for (const node of this._currentNodes) {
+            const child = node.node.children.get(c);
+            const startedAtBoundary = node.startedAtWordBeginning;
+            if (child && !this._seenNodes.has(child)) {
+                const newVisited = new VisitedPrefixNode(
+                    child,
+                    exactMatch && node.caseIsMatched && char === c,
+                    startedAtBoundary
+                );
+                newVisited.formattingDelta = node.formattingDelta;
+                this._nextNodes.push(newVisited);
+                this._seenNodes.add(child);
+            }
+        }
+    }
+
+    pushChar(char: string) {
+        this._nextNodes.length = 0;
+        this._seenNodes.clear();
+
+        const charLower = char.toLowerCase();
+        const isBoundary = PrefixTree.checkWordBoundary(char);
+
+        this._pushToNextNodes(char, char, true, isBoundary);
+        if (charLower !== char) {
+            this._pushToNextNodes(charLower, char, false, isBoundary);
+        }
+
+        // TODO: Ignore formatting (#59)
+        // ... omitted if false ...
+
+        // Double buffering: swap arrays to avoid re-allocation
+        const temp = this._currentNodes;
+        this._currentNodes = this._nextNodes;
+        this._nextNodes = temp;
     }
 
     static checkWordBoundary(char: string): boolean {
