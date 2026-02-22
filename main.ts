@@ -355,6 +355,11 @@ export default class LinkerPlugin extends Plugin {
         return path;
     }
 
+    /** Sanitize path to prevent path traversal. */
+    public sanitizePath(path: string): string {
+        return path.replace(/\.\./g, '');
+    }
+
     addContextMenuItem(menu: Menu, file: TAbstractFile, source: string) {
         // addContextMenuItem(a: any, b: any, c: any) {
         // Capture the MouseEvent when the context menu is triggered   // Define a named function to capture the MouseEvent
@@ -737,7 +742,7 @@ export default class LinkerPlugin extends Plugin {
         }
 
         if (this.settings.useCustomDirectory) {
-            await this.ensureDirectoryExists(this.settings.customDirectoryName);
+            await this.ensureDirectoryExists(this.sanitizePath(this.settings.customDirectoryName));
         }
 
         const total = linksToProcess.size;
@@ -767,8 +772,11 @@ export default class LinkerPlugin extends Plugin {
     }
 
     async processWikiLink(linkName: string) {
-        const baseFileName = `${linkName}.md`;
-        const fullPath = this.settings.useCustomDirectory ? `${this.settings.customDirectoryName}/${baseFileName}` : baseFileName;
+        // Sanitize path components to prevent path traversal
+        const sanitizedLinkName = this.sanitizePath(linkName);
+        const baseFileName = `${sanitizedLinkName}.md`;
+        const sanitizedDir = this.sanitizePath(this.settings.customDirectoryName);
+        const fullPath = this.settings.useCustomDirectory ? `${sanitizedDir}/${baseFileName}` : baseFileName;
         const existingFile = this.app.vault.getAbstractFileByPath(fullPath);
 
         let content = '';
@@ -846,7 +854,7 @@ export default class LinkerPlugin extends Plugin {
         const mentionRegex = new RegExp(`\\[\\[${linkName.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}(\\|[^\\]]+)?\\]\\]`, 'i');
 
         for (const file of this.app.vault.getMarkdownFiles()) {
-            if (this.settings.useCustomDirectory && file.path.startsWith(this.settings.customDirectoryName)) continue;
+            if (this.settings.useCustomDirectory && file.path.startsWith(this.sanitizePath(this.settings.customDirectoryName))) continue;
             const content = await this.app.vault.read(file);
             const lines = content.split('\n');
 
@@ -1540,7 +1548,11 @@ class LinkerSettingTab extends PluginSettingTab {
                 .setDesc('Folder where generated notes are created/updated.')
                 .addText((text) =>
                     text.setValue(this.plugin.settings.customDirectoryName).onChange(async (value) => {
-                        await this.plugin.updateSettings({ customDirectoryName: value });
+                        const sanitizedValue = this.plugin.sanitizePath(value);
+                        if (value !== sanitizedValue) {
+                            text.setValue(sanitizedValue);
+                        }
+                        await this.plugin.updateSettings({ customDirectoryName: sanitizedValue });
                     })
                 );
         }
