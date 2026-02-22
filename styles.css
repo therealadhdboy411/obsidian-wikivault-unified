@@ -20,6 +20,11 @@ If your plugin does not need CSS, delete this file.
     min-height: 60px;
 }
 
+.linker-settings-text-box-large {
+    min-width: 300px;
+    min-height: 300px;
+}
+
 
 .virtual-link-span:hover .multiple-files-references {
     display: inline;
