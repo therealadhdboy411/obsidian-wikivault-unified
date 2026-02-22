@@ -17,3 +17,8 @@
 **Vulnerability:** User-controlled text from notes was interpolated directly into Markdown and Wikilink syntax when converting virtual links to real links. This allowed for link breakage or content injection if the text contained characters like `]`, `[[`, or `|`.
 **Learning:** Even internal tool transformations must treat document content as untrusted when using it to build structured syntax. Markdown parsers are particularly sensitive to unescaped brackets in link text and unquoted spaces or parentheses in URLs.
 **Prevention:** Always sanitize link text by escaping brackets for Markdown and removing link-breaking characters for Wikilinks. Wrap Markdown URLs in `<...>` if they contain special characters (spaces or parentheses) to ensure they are parsed as a single unit according to CommonMark.
+
+## 2024-05-24 - API Key Exposure and Path Traversal Risks
+**Vulnerability:** API keys (OpenAI, LM Studio) were displayed in plain text in the settings UI. Additionally, user-configurable directory names and link names were used in file operations without sanitization, allowing for potential path traversal.
+**Learning:** UX and security are intertwined; sensitive inputs must be masked to prevent accidental exposure (shoulder-surfing). File system operations should always treat user-provided paths as untrusted, especially in environments where paths can be manipulated to point outside the intended root.
+**Prevention:** Mask sensitive inputs using 'password' type. Implement a central path sanitization method to strip '..' sequences and ensure all file operations use this sanitized path.
