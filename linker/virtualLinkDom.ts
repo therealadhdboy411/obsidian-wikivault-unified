@@ -20,8 +20,9 @@ export class VirtualMatch {
 
     getCompleteLinkElement() {
         const span = this.getLinkRootSpan();
-        const firstPath = this.files.length > 0 ? this.files[0].path: ""; 
-        span.appendChild(this.getLinkAnchorElement(this.originText, firstPath));
+        const firstPath = this.files.length > 0 ? this.files[0].path : '';
+        const firstFilename = this.files.length > 0 ? this.files[0].basename : '';
+        span.appendChild(this.getLinkAnchorElement(this.originText, firstPath, `Virtual link to ${firstFilename}`));
         if (this.files.length > 1) {
             if (!this.isSubWord) {
                 span.appendChild(this.getMultipleReferencesIndicatorSpan());
@@ -36,7 +37,7 @@ export class VirtualMatch {
         return span;
     }
 
-    getLinkAnchorElement(linkText: string, href: string) {
+    getLinkAnchorElement(linkText: string, href: string, ariaLabel?: string) {
         const link = document.createElement('a');
         // Security: Prevent javascript: protocol links to avoid XSS
         if (href.trim().toLowerCase().startsWith('javascript:')) {
@@ -44,6 +45,9 @@ export class VirtualMatch {
         }
         link.href = href;
         link.textContent = linkText;
+        if (ariaLabel) {
+            link.setAttribute('aria-label', ariaLabel);
+        }
         link.target = '_blank';
         link.rel = 'noopener noreferrer';
         link.setAttribute('from', this.from.toString());
@@ -70,27 +74,30 @@ export class VirtualMatch {
 
         files = files ?? this.files;
 
-
-
         files.forEach((file, index) => {
             if (index === 0) {
                 const bracket = document.createElement('span');
                 bracket.textContent = this.isSubWord ? '[' : ' [';
+                bracket.setAttribute('aria-hidden', 'true');
                 spanReferences.appendChild(bracket);
             }
 
-            let linkText = ` ${index + 1} `;
-            if (index < files!.length - 1) {
-                linkText += '|';
-            }
-
-            let linkHref = file.path;
-            const link = this.getLinkAnchorElement(linkText, linkHref);
+            const linkText = ` ${index + 1} `;
+            const linkHref = file.path;
+            const link = this.getLinkAnchorElement(linkText, linkHref, `Reference ${index + 1}: ${file.basename}`);
             spanReferences.appendChild(link);
+
+            if (index < files!.length - 1) {
+                const separator = document.createElement('span');
+                separator.textContent = '|';
+                separator.setAttribute('aria-hidden', 'true');
+                spanReferences.appendChild(separator);
+            }
 
             if (index == files!.length - 1) {
                 const bracket = document.createElement('span');
                 bracket.textContent = ']';
+                bracket.setAttribute('aria-hidden', 'true');
                 spanReferences.appendChild(bracket);
             }
         });
@@ -102,6 +109,7 @@ export class VirtualMatch {
         const spanIndicator = document.createElement('span');
         spanIndicator.textContent = ' [...]';
         spanIndicator.classList.add('multiple-files-indicator');
+        spanIndicator.setAttribute('aria-hidden', 'true');
         return spanIndicator;
     }
 
