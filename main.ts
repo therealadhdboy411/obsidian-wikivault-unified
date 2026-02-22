@@ -724,12 +724,21 @@ export default class LinkerPlugin extends Plugin {
     async generateMissingNotes() {
         const unresolvedLinks = this.app.metadataCache.unresolvedLinks;
         const linksToProcess = new Set<string>();
+        const backlinkMap: Record<string, TFile[]> = {};
 
+        // Pre-calculate backlinks for unresolved links to avoid scanning all files for each link
         for (const sourcePath in unresolvedLinks) {
+            const file = this.app.vault.getAbstractFileByPath(sourcePath);
+            if (!(file instanceof TFile) || file.extension !== 'md') continue;
+
             for (const linkName in unresolvedLinks[sourcePath]) {
                 linksToProcess.add(linkName);
+                if (!backlinkMap[linkName]) backlinkMap[linkName] = [];
+                backlinkMap[linkName].push(file);
             }
         }
+
+        const allMarkdownFiles = this.app.vault.getMarkdownFiles();
 
         if (linksToProcess.size === 0) {
             new Notice('WikiVault: No unresolved links found.');
@@ -749,7 +758,7 @@ export default class LinkerPlugin extends Plugin {
         }
 
         for (const linkName of linksToProcess) {
-            await this.processWikiLink(linkName);
+            await this.processWikiLink(linkName, backlinkMap[linkName], allMarkdownFiles);
             current++;
 
             const progressText = `WikiVault: ${current}/${total} links`;
@@ -766,19 +775,19 @@ export default class LinkerPlugin extends Plugin {
         }, 2000);
     }
 
-    async processWikiLink(linkName: string) {
+    async processWikiLink(linkName: string, sourceFiles?: TFile[], allFiles?: TFile[]) {
         const baseFileName = `${linkName}.md`;
         const fullPath = this.settings.useCustomDirectory ? `${this.settings.customDirectoryName}/${baseFileName}` : baseFileName;
         const existingFile = this.app.vault.getAbstractFileByPath(fullPath);
 
         let content = '';
 
-        const fuzzyMatch = this.findFuzzyMatch(linkName);
+        const fuzzyMatch = this.findFuzzyMatch(linkName, allFiles);
         if (fuzzyMatch && fuzzyMatch.basename.toLowerCase() !== linkName.toLowerCase()) {
             content += `See [[${fuzzyMatch.basename}]]\n\n`;
         }
 
-        const context = await this.extractContext(linkName);
+        const context = await this.extractContext(linkName, sourceFiles);
         content += `## Mentions\n\n${context}\n\n`;
 
         if (this.settings.useDictionaryAPI) {
@@ -802,9 +811,9 @@ export default class LinkerPlugin extends Plugin {
         }
     }
 
-    findFuzzyMatch(linkName: string): TFile | null {
-        const files = this.app.vault.getMarkdownFiles();
-        for (const file of files) {
+    findFuzzyMatch(linkName: string, files?: TFile[]): TFile | null {
+        const markdownFiles = files ?? this.app.vault.getMarkdownFiles();
+        for (const file of markdownFiles) {
             const similarity = this.calculateSimilarity(linkName.toLowerCase(), file.basename.toLowerCase());
             if (similarity >= this.settings.similarityThreshold) {
                 return file;
@@ -840,12 +849,14 @@ export default class LinkerPlugin extends Plugin {
         return costs[s2.length];
     }
 
-    async extractContext(linkName: string): Promise<string> {
+    async extractContext(linkName: string, sourceFiles?: TFile[]): Promise<string> {
         let context = '';
         let mentionCount = 0;
         const mentionRegex = new RegExp(`\\[\\[${linkName.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}(\\|[^\\]]+)?\\]\\]`, 'i');
 
-        for (const file of this.app.vault.getMarkdownFiles()) {
+        const filesToScan = sourceFiles ?? this.app.vault.getMarkdownFiles();
+
+        for (const file of filesToScan) {
             if (this.settings.useCustomDirectory && file.path.startsWith(this.settings.customDirectoryName)) continue;
             const content = await this.app.vault.read(file);
             const lines = content.split('\n');
