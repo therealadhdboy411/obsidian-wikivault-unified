@@ -5,3 +5,7 @@
 ## 2025-05-15 - [Regex Overhead]
 **Learning:** Creating regex instances inside frequently called static methods like `checkWordBoundary` introduces significant overhead during document scanning.
 **Action:** Hoist frequently used regexes to static constants.
+
+## 2025-05-15 - [Batch Link Context Optimization]
+**Learning:** Sequential processing of unresolved links in `generateMissingNotes` led to $O(L \cdot N)$ vault scans. Using Obsidian's `unresolvedLinks` metadata to pre-calculate a backlink map allows $O(L \cdot S)$ processing by only reading files that actually contain the mention.
+**Action:** Always check `metadataCache` before performing vault-wide file scans for specific terms.
